@@ -1,0 +1,6 @@
+RewriteEngine on
+RewriteRule ^\.env / [R,NC,L]
+RewriteRule ^index\.js / [R,NC,L]
+RewriteRule .*\.(js|css)$ - [F]
+RewriteRule ^data/states\.json / [R,NC,L]
+Options -Indexes

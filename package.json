@@ -1,0 +1,32 @@
+{
+  "name": "Astra",
+  "version": "1.0.0",
+  "description": "Astra",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "education"
+  ],
+  "author": "Sorav Garg (soravgarg123@gmail.com)",
+  "license": "ISC",
+  "dependencies": {
+    "async": "^3.2.0",
+    "bcrypt": "^5.0.1",
+    "compression": "^1.7.4",
+    "core-js": "^3.6.5",
+    "cors": "^2.8.5",
+    "date-time": "^3.1.0",
+    "dateformat": "^3.0.3",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "express-validator": "^6.4.0",
+    "get-json": "^1.0.1",
+    "ip": "^1.1.5",
+    "moment": "^2.27.0",
+    "moment-timezone": "^0.5.32",
+    "mongoose": "^5.12.13",
+    "pretty-error": "^2.1.1"
+  }
+}
