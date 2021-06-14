@@ -13,8 +13,10 @@ const async = require("async"),
 
 const {StudentsModel} = require("../models/studentsModel");
 const {StudentClassModel} = require("../models/studentClassModel");
+const {ParentsModel} = require("../models/parentsModel");
+const {ParentStudentModel} = require("../models/parentStudentModel");
 
-let studentsController = {validate,add}
+let studentsController = {validate,add,assign}
 
   /**
      * For Validation
@@ -34,6 +36,35 @@ let studentsController = {validate,add}
                        return true
                     }),
                     check('ClassID').trim()
+                 ]
+           }
+           break;
+           case 'assign': {
+              return [ 
+                    check('ParentID').notEmpty().withMessage('Parent ID field is required').trim().custom(val => {   
+                      return ParentsModel.findOne({ _id: val}).select({"_id": 1}).exec().then(parent => {
+                        if (!parent) {
+                          return Promise.reject('Invalid Parent ID.');
+                        }
+                        return Promise.resolve(true);
+                      });
+                    }),
+                    check('StudentID').notEmpty().withMessage('Student ID field is required').trim().custom(val => {   
+                      return StudentsModel.findOne({ _id: val}).select({"_id": 1}).exec().then(student => {
+                        if (!student) {
+                          return Promise.reject('Invalid Student ID.');
+                        }
+                        return Promise.resolve(true);
+                      });
+                    }),
+                    check('ValidTill').notEmpty().withMessage('Valid till field is required').trim().custom(val => {   
+                      if (!datetime.validateDateTime(val,'YYYY-MM-DD')){
+                       throw new Error('Invalid Date Or format, It should be (YYYY-MM-DD)');
+                      }else if(!datetime.isFutureDate(val,'YYYY-MM-DD')){
+                        throw new Error('Valid till date should be future date.');
+                      }
+                      return true
+                    })
                  ]
            }
            break;
@@ -58,7 +89,7 @@ let studentsController = {validate,add}
 
       /* To Validate Unique Name */
       try {
-        var IsName = await StudentsModel.findOne({ Name: req.body.Name}).select({ "Name": 1, "_id": 0}).exec();
+        var IsName = await StudentsModel.findOne({ Name: req.body.Name}).select({ "Name": 1, "_id": 0}).limit(1).exec();
         if(IsName){
           return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Student name number already exists !'});
         }
@@ -76,7 +107,51 @@ let studentsController = {validate,add}
           let StudentClassModelObj = new StudentClassModel({ClassID:(req.body.ClassID || 10),StudentID:student._id});
           StudentClassModelObj.save();
 
-          return res.status(200).json({ResponseCode: 200, Data: [], Message: 'Student created successfully.'});
+          return res.status(200).json({ResponseCode: 200, Data: {StudentID:student._id}, Message: 'Student created successfully.'});
+        }else{
+          return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
+        }
+      })
+      .catch((error) => {
+        return res.status(500).json({ResponseCode: 500, Data: [], Message: error._message});
+      });
+  }
+
+  /**
+      For Assign Student
+  **/
+  async function assign(req, res) {
+    
+    /* To Check Validation Results */
+     let errors = validationResult(req);
+     if (!errors.isEmpty()) {
+         res.status(500).json({
+                 ResponseCode: 500,
+                 Data: [],
+                 Message: errors.array()[0].msg
+         });
+         return;
+      }
+
+      /* To check If Parent is already assigned */
+      var IsParentAssigned = await ParentsModel.findOne({ ParentID: req.body.ParentID}).select({"_id": 1}).limit(1).exec();
+      if(IsParentAssigned){
+        return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Parent already assigned.'});
+      }
+
+      /* To check If Student is already assigned */
+      var IsStudentAssigned = await StudentsModel.findOne({ StudentID: req.body.StudentID}).select({"_id": 1}).limit(1).exec();
+      if(IsStudentAssigned){
+        return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Student already assigned.'});
+      }
+
+      /* Assign Parent & Student */
+      let StudentParentModelObj = new ParentStudentModel({ParentID:req.body.ParentID,StudentID:req.body.StudentID,ValidTill:req.body.ValidTill});
+      StudentParentModelObj.save()
+      .then((student) => {
+        if(student._id){
+
+          return res.status(200).json({ResponseCode: 200, Data: [], Message: 'Student & parent assigned successfully.'});
         }else{
           return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
         }
