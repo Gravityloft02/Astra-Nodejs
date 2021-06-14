@@ -60,7 +60,7 @@ let adminsController = {validate,add}
 
       /* To Validate Unique Phone Number */
       try {
-        var IsPhoneNumber = await UsersModel.findOne({ Phone: req.body.Phone}).select({ "Phone": 1, "_id": 0}).exec();
+        var IsPhoneNumber = await UsersModel.findOne({ Phone: req.body.Phone}).select({ "Phone": 1, "_id": 0}).limit(1).exec();
         if(IsPhoneNumber){
           return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Phone number already registered !'});
         }
@@ -80,7 +80,7 @@ let adminsController = {validate,add}
           let UserModelObj = new UsersModel({Phone:req.body.Phone, Password:HashPassword});
           UserModelObj.save();
 
-          return res.status(200).json({ResponseCode: 200, Data: [], Message: 'Admin created successfully.'});
+          return res.status(200).json({ResponseCode: 200, Data: {AdminID:Admin._id}, Message: 'Admin created successfully.'});
         }else{
           return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
         }

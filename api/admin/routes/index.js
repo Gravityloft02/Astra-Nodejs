@@ -15,6 +15,7 @@ const express = require('express'),
 
       /* Schools Routings */
       router.post('/school/add',schools.validate('add'),schools.add);
+      router.post('/school/assign',schools.validate('assign'),schools.assign);
 
       /* Admins Routings */
       router.post('/admin/add',admins.validate('add'),admins.add);
@@ -24,5 +25,6 @@ const express = require('express'),
 
       /* Students Routings */
       router.post('/student/add',students.validate('add'),students.add);
+      router.post('/student/assign',students.validate('assign'),students.assign);
 
 module.exports = router;      
