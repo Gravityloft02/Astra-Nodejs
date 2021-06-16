@@ -27,14 +27,7 @@ let studentsController = {validate,add,assign}
               return [ 
                     check('Name').notEmpty().withMessage('School Name field is required').trim().escape(),
                     check('Address').notEmpty().withMessage('Address field is required').trim().escape(),
-                    check('DOB').notEmpty().withMessage('Date of birth field is required').trim().custom(dob => {  
-                       if (!datetime.validateDateTime(dob,'YYYY-MM-DD')){
-                         throw new Error('Invalid Date of birth Or format, It should be (YYYY-MM-DD)');
-                       }else if(datetime.getUserAge(dob) < constant.MIN_AGE){
-                         throw new Error('Age should be greater than or equal to '+constant.MIN_AGE);
-                       }
-                       return true
-                    }),
+                    check('DOB').notEmpty().withMessage('Date of birth field is required').trim(),
                     check('ClassID').trim()
                  ]
            }
@@ -57,10 +50,10 @@ let studentsController = {validate,add,assign}
                         return Promise.resolve(true);
                       });
                     }),
-                    check('ValidTill').notEmpty().withMessage('Valid till field is required').trim().custom(val => {   
-                      if (!datetime.validateDateTime(val,'YYYY-MM-DD')){
+                    check('ValidTill').optional().trim().custom(val => {   
+                      if (val && !datetime.validateDateTime(val,'YYYY-MM-DD')){
                        throw new Error('Invalid Date Or format, It should be (YYYY-MM-DD)');
-                      }else if(!datetime.isFutureDate(val,'YYYY-MM-DD')){
+                      }else if(val && !datetime.isFutureDate(val,'YYYY-MM-DD')){
                         throw new Error('Valid till date should be future date.');
                       }
                       return true
@@ -104,7 +97,7 @@ let studentsController = {validate,add,assign}
         if(student._id){
 
           /* Save Student Class */
-          let StudentClassModelObj = new StudentClassModel({ClassID:(req.body.ClassID || 10),StudentID:student._id});
+          let StudentClassModelObj = new StudentClassModel({ClassID:(req.body.ClassID || 7),StudentID:student._id});
           StudentClassModelObj.save();
 
           return res.status(200).json({ResponseCode: 200, Data: {StudentID:student._id}, Message: 'Student created successfully.'});
@@ -146,7 +139,7 @@ let studentsController = {validate,add,assign}
       }
 
       /* Assign Parent & Student */
-      let StudentParentModelObj = new ParentStudentModel({ParentID:req.body.ParentID,StudentID:req.body.StudentID,ValidTill:req.body.ValidTill});
+      let StudentParentModelObj = new ParentStudentModel({ParentID:req.body.ParentID,StudentID:req.body.StudentID,ValidTill:(req.body.ValidTill || datetime.addTime(1,'years'))});
       StudentParentModelObj.save()
       .then((student) => {
         if(student._id){

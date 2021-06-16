@@ -59,10 +59,10 @@ let schoolsController = {validate,add,assign}
                         return Promise.resolve(true);
                       });
                     }),
-                    check('ValidTill').notEmpty().withMessage('Valid till field is required').trim().custom(val => {   
-                      if (!datetime.validateDateTime(val,'YYYY-MM-DD')){
+                    check('ValidTill').optional().trim().custom(val => {   
+                      if (val && !datetime.validateDateTime(val,'YYYY-MM-DD')){
                        throw new Error('Invalid Date Or format, It should be (YYYY-MM-DD)');
-                      }else if(!datetime.isFutureDate(val,'YYYY-MM-DD')){
+                      }else if(val && !datetime.isFutureDate(val,'YYYY-MM-DD')){
                         throw new Error('Valid till date should be future date.');
                       }
                       return true
@@ -95,7 +95,7 @@ let schoolsController = {validate,add,assign}
         if(school._id){
 
           /* Save School Classes */
-          let SchoolClassesModelObj = new SchoolClassesModel({ClassID:(req.body.ClassID || 13),SchoolID:school._id,AcademicYear:(req.body.AcademicYear || '2021-22'),Std:(req.body.Std || 'Test'),Division:(req.body.Division || 'A')});
+          let SchoolClassesModelObj = new SchoolClassesModel({ClassID:(req.body.ClassID || 7),SchoolID:school._id,AcademicYear:(req.body.AcademicYear || '2021-22'),Std:(req.body.Std || '7'),Division:(req.body.Division || 'A')});
           SchoolClassesModelObj.save();
 
           return res.status(200).json({ResponseCode: 200, Data: {SchoolID:school._id}, Message: 'School created successfully.'});
@@ -137,7 +137,7 @@ let schoolsController = {validate,add,assign}
       }
 
       /* Assign Admin & School */
-      let SchoolAdminModelObj = new SchoolAdminModel({AdminID:req.body.AdminID,SchoolID:req.body.SchoolID,ValidTill:req.body.ValidTill});
+      let SchoolAdminModelObj = new SchoolAdminModel({AdminID:req.body.AdminID,SchoolID:req.body.SchoolID,ValidTill:(req.body.ValidTill || datetime.addTime(1,'years'))});
       SchoolAdminModelObj.save()
       .then((school) => {
         if(school._id){
