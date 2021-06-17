@@ -1,8 +1,8 @@
 "use strict";
 
 /*
- * Purpose : API Middleware To Users
- * Package : Users
+ * Purpose : API Middleware To Parents
+ * Package : Parents
  * Developed By  : Gravityloft
  */
 
@@ -12,12 +12,12 @@ const async = require("async"),
 /* Require Enviornment File  */
 require('dotenv').config();
 
-let userMiddleware = {verifyUserToken}
+let parentMiddleware = {verifyToken}
 
 /**
-  To Verify User Token
+  To Verify Parent Token
 **/
-async function verifyUserToken(req, res, next) {
+async function verifyToken(req, res, next) {
 	if(!req.headers.authorization){
 		res.status(401).json({
             ResponseCode: 401, // Unauthorized
@@ -31,10 +31,14 @@ async function verifyUserToken(req, res, next) {
 	jwt.verify((req.headers.authorization).replace('Bearer ','') ,process.env.TOKEN_SECRET,function(err,user){
 		if(err){
 			return res.status(403).json({ResponseCode: 403, Data : [], Message: 'Invalid Token !' }); // Forbidden
+		}else if(!user.UserType || user.UserType != 'Parent'){
+			return res.status(403).json({ResponseCode: 403, Data : [], Message: 'Access denied !' }); // Forbidden
 		}
 		req.body.UserID = user.UserID;
+		req.body.ParentID = user.ParentID;
+		req.body.UserType = user.UserType;
 		next();
 	})
 }
 
-module.exports = userMiddleware;
+module.exports = parentMiddleware;

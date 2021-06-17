@@ -7,6 +7,7 @@
 */
 
 const async = require("async"),
+      jwt   = require("jsonwebtoken"),
       constant = require('../../../config/globalConstant'),
       helper = require('../../../lib/helper'),
       datetime = require('../../../lib/datetime'),
@@ -15,7 +16,10 @@ const async = require("async"),
 const {AdminsModel} = require("../../models/adminsModel");
 const {UsersModel} = require("../../models/usersModel");
 
-let adminsController = {validate,add}
+/* Require Enviornment File  */
+require('dotenv').config();
+
+let adminsController = {validate,add,authenticate}
 
   /**
      * For Validation
@@ -36,6 +40,13 @@ let adminsController = {validate,add}
                    return true
                 }),
                 check('Password').trim()
+               ]
+           }
+           break;
+           case 'authenticate': {
+              return [ 
+                check('Phone').notEmpty().withMessage('Phone number field is required').trim().isLength({min: 10, max:10}).withMessage('Phone number field length should be 10').matches(/^[0-9]{10}$/).withMessage('Invalid Phone number'),
+                check('Password').notEmpty().withMessage('Password field is required').trim(),
                ]
            }
            break;
@@ -60,12 +71,11 @@ let adminsController = {validate,add}
 
       /* To Validate Unique Phone Number */
       try {
-        var IsPhoneNumber = await UsersModel.findOne({ Phone: req.body.Phone}).select({ "Phone": 1, "_id": 0}).limit(1).exec();
+        var IsPhoneNumber = await AdminsModel.findOne({ Phone: req.body.Phone}).select({ "Phone": 1, "_id": 0}).limit(1).exec();
         if(IsPhoneNumber){
           return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Phone number already registered !'});
         }
       } catch (err) {
-        console.log('err',err)
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }
 
@@ -75,17 +85,67 @@ let adminsController = {validate,add}
         let Admin = await AdminModelObj.save();
         if(Admin._id){
 
-          /* Save User Entry */
-          let HashPassword = await helper.generateHashStr(req.body.Password||req.body.Phone);
-          let UserModelObj = new UsersModel({Phone:req.body.Phone, Password:HashPassword});
-          UserModelObj.save();
-
+          /* To Validate Already a User with Different Role */
+          try {
+            var IsPhoneNumber = await UsersModel.findOne({ Phone: req.body.Phone}).select({ "Phone": 1, "_id": 0}).limit(1).exec();
+            if(!IsPhoneNumber){
+              
+              /* Save User Entry */
+              let HashPassword = await helper.generateHashStr(req.body.Password||req.body.Phone);
+              let UserModelObj = new UsersModel({Phone:req.body.Phone, Password:HashPassword});
+              UserModelObj.save();
+            }
+          } catch (err) {
+            return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
+          }
           return res.status(200).json({ResponseCode: 200, Data: {AdminID:Admin._id}, Message: 'Admin created successfully.'});
         }else{
           return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
         }
       } catch (err) {
-        console.log('err',err)
+        return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
+      }
+  }
+
+  /**
+      For Admin Authenticate
+  **/
+  async function authenticate(req, res) {
+    
+     /* To Check Validation Results */
+     let errors = validationResult(req);
+     if (!errors.isEmpty()) {
+         res.status(500).json({
+                 ResponseCode: 500,
+                 Data: [],
+                 Message: errors.array()[0].msg
+         });
+         return;
+      }
+
+      /* To Verify Login Details */
+      try {
+        var UserObj = await UsersModel.findOne({ Phone: req.body.Phone}).select({"_id": 1, "Password" : 1}).limit(1).exec();
+        if(!UserObj){
+          return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Phone number not exists !'});
+        }
+
+        /* Validate Passowrd */
+        if(!helper.compareHashStr(req.body.Phone,UserObj.Password)){
+          return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Incorrect Password !'});
+        }
+
+        /* Check Entry In Admins */
+        var AdminObj = await AdminsModel.findOne({ Phone: req.body.Phone}).select({"_id": 1}).limit(1).exec();
+        if(!AdminObj){
+          return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Phone number not exists !'});
+        }
+
+        /* Generate Token */
+        let RespObj = {};
+            RespObj.Token = jwt.sign({UserID:UserObj._id, AdminID:AdminObj._id, UserType : 'Admin'}, process.env.TOKEN_SECRET, { expiresIn: '3600s' }); // 60 minutes
+        return res.status(200).json({ResponseCode: 200, Data: RespObj, Message: 'success'});
+      } catch (err) {
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }
   }

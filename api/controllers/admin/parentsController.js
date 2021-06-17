@@ -60,12 +60,11 @@ let parentsController = {validate,add}
 
       /* To Validate Unique Phone Number */
       try {
-        var IsPhoneNumber = await UsersModel.findOne({ Phone: req.body.Phone}).select({ "Phone": 1, "_id": 0}).limit(1).exec();
+        var IsPhoneNumber = await ParentsModel.findOne({ Phone: req.body.Phone}).select({ "Phone": 1, "_id": 0}).limit(1).exec();
         if(IsPhoneNumber){
           return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Phone number already registered !'});
         }
       } catch (err) {
-        console.log('err',err)
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }
 
@@ -75,17 +74,24 @@ let parentsController = {validate,add}
         let Parent = await ParentModelObj.save();
         if(Parent._id){
 
-          /* Save User Entry */
-          let HashPassword = await helper.generateHashStr(req.body.Password||req.body.Phone);
-          let UserModelObj = new UsersModel({Phone:req.body.Phone, Password:HashPassword});
-          UserModelObj.save();
-
+          /* To Validate Already a User with Different Role */
+          try {
+            var IsPhoneNumber = await UsersModel.findOne({ Phone: req.body.Phone}).select({ "Phone": 1, "_id": 0}).limit(1).exec();
+            if(!IsPhoneNumber){
+              
+              /* Save User Entry */
+              let HashPassword = await helper.generateHashStr(req.body.Password||req.body.Phone);
+              let UserModelObj = new UsersModel({Phone:req.body.Phone, Password:HashPassword});
+              UserModelObj.save();
+            }
+          } catch (err) {
+            return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
+          }
           return res.status(200).json({ResponseCode: 200, Data: {ParentID:Parent._id}, Message: 'Parent created successfully.'});
         }else{
           return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
         }
       } catch (err) {
-        console.log('err',err)
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }
   }

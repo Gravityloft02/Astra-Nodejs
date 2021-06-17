@@ -17,6 +17,8 @@ const parentsSchema = new Schema({
     },
     Address: { type: String, required: true },
     DOB: { type: String, required: true },
+    DeviceType: { type: String, enum : ['Android', 'IOS'] },
+    DeviceKey: { type: String },
 });
 
 parentsSchema.set('timestamps', true);
