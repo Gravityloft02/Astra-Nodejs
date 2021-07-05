@@ -10,7 +10,7 @@ const mongoose   = require('mongoose'),
 
 const studentClassSchema = new Schema({
     StudentID: { type: String, required: true },
-    ClassID: { type: Number, required: true},
+    SchoolClassID: { type: String, required: true },
 });
 
 module.exports.StudentClassModel = mongoose.model('Student-Class', studentClassSchema);

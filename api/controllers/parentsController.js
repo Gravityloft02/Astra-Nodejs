@@ -15,11 +15,13 @@ const async = require("async"),
 
 const {UsersModel} = require("../models/usersModel");
 const {ParentsModel} = require("../models/parentsModel");
+const {StudentsModel} = require("../../models/studentsModel");
+const {PaymentsModel} = require("../../models/paymentsModel");
 
 /* Require Enviornment File  */
 require('dotenv').config();
 
-let parentsController = {validate,authenticate,update_device_details}
+let parentsController = {validate,authenticate,update_device_details,fee_initiate}
 
   /**
      * For Validation
@@ -39,6 +41,20 @@ let parentsController = {validate,authenticate,update_device_details}
               return [ 
                 check('DeviceType').notEmpty().withMessage('Device Type field is required').trim().isIn(['Android', 'IOS']).withMessage('Device type value should be Android Or IOS'),
                 check('DeviceKey').notEmpty().withMessage('Device Key field is required').trim()
+               ]
+           }
+           break;
+           case 'fee_initiate': {
+              return [ 
+                check('StudentID').notEmpty().withMessage('Student ID field is required').trim().custom(val => {   
+                  return StudentsModel.findOne({ _id: val}).select({"_id": 1}).exec().then(student => {
+                    if (!student) {
+                      return Promise.reject('Invalid Student ID.');
+                    }
+                    return Promise.resolve(true);
+                  });
+                }),
+                check('Amount').notEmpty().withMessage('Amount field is required').trim()
                ]
            }
            break;
@@ -69,7 +85,7 @@ let parentsController = {validate,authenticate,update_device_details}
         }
 
         /* Validate Passowrd */
-        if(!helper.compareHashStr(req.body.Phone,UserObj.Password)){
+        if(!helper.compareHashStr(req.body.Password,UserObj.Password)){
           return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Incorrect Password !'});
         }
 
@@ -112,6 +128,38 @@ let parentsController = {validate,authenticate,update_device_details}
         var ParentObj = await ParentsModel.findOneAndUpdate({ _id: req.body.ParentID},{ DeviceType: req.body.DeviceType, DeviceKey: req.body.DeviceKey},{upsert:false, rawResult:true});
         return res.status(200).json({ResponseCode: 200, Data: [], Message: 'success'});
       } catch (err) {
+        return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
+      }
+  }
+
+  /**
+      For Initiate Student Fee
+  **/
+  async function fee_initiate(req, res) {
+    
+     /* To Check Validation Results */
+     let errors = validationResult(req);
+     if (!errors.isEmpty()) {
+         res.status(500).json({
+                 ResponseCode: 500,
+                 Data: [],
+                 Message: errors.array()[0].msg
+         });
+         return;
+      }
+
+      /* Save Payment */
+      let PaymentData = {};
+          PaymentData.StudentID = req.body.StudentID;
+          PaymentData.ParentID  = req.body.ParentID;
+          PaymentData.Amount    = req.body.Amount;
+          PaymentData.Status    = "Pending";
+          PaymentData.FeeID = "Pending";
+      let PaymentsModelObj = new PaymentsModel(PaymentData);
+      let Payment = await PaymentsModelObj.save();
+      if(Payment._id){
+        return res.status(200).json({ResponseCode: 200, Data: {PaymentID:Payment._id, RazorPayMerchantKey : process.env.RAZORPAY_MERCHANT_KEY}, Message: 'success.'});
+      }else{
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }
   }

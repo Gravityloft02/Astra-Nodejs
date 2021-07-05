@@ -55,6 +55,7 @@ app.use(function(req, res, next) {
 /* API Routings */
 app.use('/api/admin/', require('./api/routes/admin'));
 app.use('/api/', require('./api/routes/parent'));
+app.use('/api/', require('./api/routes/user'));
 
 /* Redirect On Website */
 app.get('/', function(req, res) {

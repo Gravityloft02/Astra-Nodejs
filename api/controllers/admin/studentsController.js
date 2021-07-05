@@ -28,7 +28,7 @@ let studentsController = {validate,add,assign}
                     check('Name').notEmpty().withMessage('School Name field is required').trim().escape(),
                     check('Address').notEmpty().withMessage('Address field is required').trim().escape(),
                     check('DOB').notEmpty().withMessage('Date of birth field is required').trim(),
-                    check('ClassID').trim()
+                    check('SchoolClassID').notEmpty().withMessage('School Class ID field is required').trim().escape()
                  ]
            }
            break;
@@ -97,7 +97,7 @@ let studentsController = {validate,add,assign}
         if(student._id){
 
           /* Save Student Class */
-          let StudentClassModelObj = new StudentClassModel({ClassID:(req.body.ClassID || 7),StudentID:student._id});
+          let StudentClassModelObj = new StudentClassModel({SchoolClassID:req.body.SchoolClassID,StudentID:student._id});
           StudentClassModelObj.save();
 
           return res.status(200).json({ResponseCode: 200, Data: {StudentID:student._id}, Message: 'Student created successfully.'});
@@ -106,6 +106,7 @@ let studentsController = {validate,add,assign}
         }
       })
       .catch((error) => {
+        console.log(error)
         return res.status(500).json({ResponseCode: 500, Data: [], Message: error._message});
       });
   }
@@ -127,13 +128,13 @@ let studentsController = {validate,add,assign}
       }
 
       /* To check If Parent is already assigned */
-      var IsParentAssigned = await ParentsModel.findOne({ ParentID: req.body.ParentID}).select({"_id": 1}).limit(1).exec();
+      var IsParentAssigned = await ParentStudentModel.findOne({ ParentID: req.body.ParentID}).select({"_id": 1}).limit(1).exec();
       if(IsParentAssigned){
         return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Parent already assigned.'});
       }
 
       /* To check If Student is already assigned */
-      var IsStudentAssigned = await StudentsModel.findOne({ StudentID: req.body.StudentID}).select({"_id": 1}).limit(1).exec();
+      var IsStudentAssigned = await ParentStudentModel.findOne({ StudentID: req.body.StudentID}).select({"_id": 1}).limit(1).exec();
       if(IsStudentAssigned){
         return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Student already assigned.'});
       }
