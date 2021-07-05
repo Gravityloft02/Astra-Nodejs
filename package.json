@@ -12,6 +12,7 @@
   "author": "Sorav Garg (soravgarg123@gmail.com)",
   "license": "ISC",
   "dependencies": {
+    "@classdo/classdo": "^0.2.1",
     "async": "^3.2.0",
     "bcrypt": "^5.0.1",
     "compression": "^1.7.4",
@@ -23,6 +24,7 @@
     "express": "^4.17.1",
     "express-validator": "^6.4.0",
     "get-json": "^1.0.1",
+    "graphql-to-json-converter": "^1.2.0",
     "ip": "^1.1.5",
     "jsonwebtoken": "^8.5.1",
     "moment": "^2.27.0",

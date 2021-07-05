@@ -8,11 +8,12 @@
 
 const express = require('express'),
       router  = express.Router(),
-      mddleware  = require('../middleware/parentMiddleware'),
+      middleware  = require('../middleware/parentsMiddleware'),
       parents   = require('../controllers/parentsController');
 
       /* Parents Routings */
       router.post('/parent/authenticate',parents.validate('authenticate'),parents.authenticate);
-      router.put('/parent/update-device-details',mddleware.verifyToken,parents.validate('update_device_details'),parents.update_device_details);
+      router.patch('/parent/update-device-details',middleware.verifyToken,parents.validate('update_device_details'),parents.update_device_details); // Only update
+      router.post('/parent/fee-initiate',middleware.verifyToken,parents.validate('fee_initiate'),parents.fee_initiate); 
 
 module.exports = router;      

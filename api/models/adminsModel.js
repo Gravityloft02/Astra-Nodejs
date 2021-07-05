@@ -17,6 +17,7 @@ const adminsSchema = new Schema({
     },
     Address: { type: String, required: true },
     DOB: { type: String, required: true },
+    RazorPayRouteAccountID: { type: String, required: true },
 });
 
 adminsSchema.set('timestamps', true);

@@ -39,6 +39,7 @@ let adminsController = {validate,add,authenticate}
                    }
                    return true
                 }),
+                check('RazorPayRouteAccountID').notEmpty().withMessage('RazorPay Route Account ID field is required').trim().escape(),
                 check('Password').trim()
                ]
            }
@@ -80,7 +81,7 @@ let adminsController = {validate,add,authenticate}
       }
 
       /* Save Admin */
-      let AdminModelObj = new AdminsModel({Name:req.body.Name,Address:req.body.Address,Phone:req.body.Phone,DOB:req.body.DOB});
+      let AdminModelObj = new AdminsModel({Name:req.body.Name,Address:req.body.Address,Phone:req.body.Phone,DOB:req.body.DOB,RazorPayRouteAccountID:req.body.RazorPayRouteAccountID});
       try {
         let Admin = await AdminModelObj.save();
         if(Admin._id){
@@ -103,6 +104,8 @@ let adminsController = {validate,add,authenticate}
           return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
         }
       } catch (err) {
+
+        console.log(err)
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }
   }
@@ -131,7 +134,7 @@ let adminsController = {validate,add,authenticate}
         }
 
         /* Validate Passowrd */
-        if(!helper.compareHashStr(req.body.Phone,UserObj.Password)){
+        if(!helper.compareHashStr(req.body.Password,UserObj.Password)){
           return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Incorrect Password !'});
         }
 

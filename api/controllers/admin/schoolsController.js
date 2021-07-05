@@ -16,6 +16,7 @@ const {SchoolsModel} = require("../../models/schoolsModel");
 const {AdminsModel} = require("../../models/adminsModel");
 const {SchoolClassesModel} = require("../../models/schoolClassModel");
 const {SchoolAdminModel} = require("../../models/schoolAdminModel");
+const {FeesModel} = require("../../models/feesModel");
 
 let schoolsController = {validate,add,assign}
 
@@ -89,23 +90,23 @@ let schoolsController = {validate,add,assign}
          return;
       }
 
+      /* Save School */
       let SchoolModelObj = new SchoolsModel({Name:req.body.Name,Address:req.body.Address,State:req.body.State});
-      SchoolModelObj.save()
-      .then((school) => {
-        if(school._id){
+      let School = await SchoolModelObj.save();
+      if(School._id){
 
-          /* Save School Classes */
-          let SchoolClassesModelObj = new SchoolClassesModel({ClassID:(req.body.ClassID || 7),SchoolID:school._id,AcademicYear:(req.body.AcademicYear || '2021-22'),Std:(req.body.Std || '7'),Division:(req.body.Division || 'A')});
-          SchoolClassesModelObj.save();
+        /* Save School Classes */
+        let SchoolClassesModelObj = new SchoolClassesModel({ClassID:(req.body.ClassID || 7),SchoolID:School._id,AcademicYear:(req.body.AcademicYear || '2021-22'),Std:(req.body.Std || '7'),Division:(req.body.Division || 'A')});
+        let SchoolClass = await SchoolClassesModelObj.save();
 
-          return res.status(200).json({ResponseCode: 200, Data: {SchoolID:school._id}, Message: 'School created successfully.'});
-        }else{
-          return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
-        }
-      })
-      .catch((error) => {
-        return res.status(500).json({ResponseCode: 500, Data: [], Message: error._message});
-      });
+        /* Save Fees */
+        let FeesModelObj = new FeesModel({ClassID:(req.body.ClassID || 7),SchoolID:School._id,Amount:(req.body.Amount || 10000),DueDate:(req.body.DueDate || datetime.addTime(3,'months'))});
+        await FeesModelObj.save();
+
+        return res.status(200).json({ResponseCode: 200, Data: {SchoolID:School._id,SchoolClassID:SchoolClass._id}, Message: 'School created successfully.'});
+      }else{
+        return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
+      }
   }
 
   /**
