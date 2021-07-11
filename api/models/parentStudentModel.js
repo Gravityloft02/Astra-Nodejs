@@ -12,6 +12,7 @@ const parentStudentSchema = new Schema({
     ParentID: { type: String, required: true},
     StudentID: { type: String, required: true },
     ValidTill: { type: String, required: true },
+    StudentClass: [{ type: Schema.Types.ObjectId, ref:'StudentClassModel' }],
 });
 
 parentStudentSchema.set('timestamps', true);
