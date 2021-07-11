@@ -15,8 +15,8 @@ const async = require("async"),
 
 const {UsersModel} = require("../models/usersModel");
 const {ParentsModel} = require("../models/parentsModel");
-const {StudentsModel} = require("../../models/studentsModel");
-const {PaymentsModel} = require("../../models/paymentsModel");
+const {StudentsModel} = require("../models/studentsModel");
+const {PaymentsModel} = require("../models/paymentsModel");
 
 /* Require Enviornment File  */
 require('dotenv').config();
