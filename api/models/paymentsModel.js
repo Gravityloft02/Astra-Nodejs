@@ -12,11 +12,11 @@ const paymentsSchema = new Schema({
     TransactionID: { type: String, required: false},
     PaidToAccountID: { type: String, required: false},
     RazorPayJsonResponse: { type: Object, required: false},
-    FeeID: { type: String, required: true },
+    FeeID: { type: String, required: true },	
     ParentID: { type: String, required: true },
     StudentID: { type: String, required: true },
     Amount: { type: Number, required: true},
-    Status: { type: String, enum : ['Failed', 'Pending', 'Sucess'] },
+    Status: { type: String, enum : ['Failed', 'Pending', 'Success'] },
 });
 
 paymentsSchema.set('timestamps', true);

@@ -14,6 +14,7 @@ const express = require('express'),
       /* Parents Routings */
       router.post('/parent/authenticate',parents.validate('authenticate'),parents.authenticate);
       router.patch('/parent/update-device-details',middleware.verifyToken,parents.validate('update_device_details'),parents.update_device_details); // Only update
-      router.post('/parent/fee-initiate',middleware.verifyToken,parents.validate('fee_initiate'),parents.fee_initiate); 
+      router.post('/parent/fee-payment-initiate',middleware.verifyToken,parents.validate('fee_initiate'),parents.fee_initiate); 
+      router.patch('/parent/fee-payment-verify',middleware.verifyToken,parents.validate('fee_payment_verify'),parents.fee_payment_verify); 
 
 module.exports = router;      
