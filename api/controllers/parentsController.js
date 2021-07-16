@@ -258,15 +258,12 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
       let PaymentsModelObj = new PaymentsModel(PaymentData);
       let Payment = await PaymentsModelObj.save();
       if(Payment._id){
-        return res.status(200).json({ResponseCode: 200, Data: {PaymentID:Payment._id, RazorPayMerchantKey : process.env.RAZORPAY_MERCHANT_KEY}, Message: 'success.'});
+        return res.status(200).json({ResponseCode: 200, Data: {PaymentID:Payment._id, RazorPayKeyID : process.env.RAZORPAY_KEY_ID}, Message: 'success.'});
       }else{
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }
   }
 
-<<<<<<< HEAD
-module.exports = parentsController;
-=======
   /**
       For Verify Student Fee Payment
   **/
