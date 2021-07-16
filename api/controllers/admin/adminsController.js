@@ -15,9 +15,46 @@ const async = require("async"),
 
 const {AdminsModel} = require("../../models/adminsModel");
 const {UsersModel} = require("../../models/usersModel");
+const {SchoolAdminModel} = require("../../models/schoolAdminModel");
+const {FeesModel} = require("../../models/feesModel");
+const {SchoolClassesModel} = require("../../models/schoolClassModel");
 
 /* Require Enviornment File  */
 require('dotenv').config();
+
+SchoolClassesModel.aggregate([
+              { "$lookup": {
+                  "from": "student-classes",
+                  "localField": "studentclasses.SchoolClassID",
+                  "foreignField": "_id",
+                  "as": "studentclasses"
+              } },    
+              { "$lookup": {
+                  "from": "students",
+                  "localField": "students.StudentID",
+                  "foreignField": "studentclasses.SchoolID",
+                  "as": "students"
+              } },
+              { "$lookup": {
+                  "from": "payments",
+                  "localField": "payments.StudentID",
+                  "foreignField": "students._id",
+                  "as": "payments"
+              } },
+
+              { "$match": { "SchoolID": '60dc52628f97fe3ac6b88b9c'}},
+              { "$project": {
+                  "_id" : 0,
+                  "StudentID" : { "$arrayElemAt" : ["$students._id", 0] },
+                  "StudentName" : { "$arrayElemAt" : ["$students.Name", 0] },
+                  "ClassID" : 1,
+                  "AcademicYear" : 1,
+                  "Std" : 1,
+                  "Division" : 1,
+              } }
+           ]).exec(function(err,resp){
+            console.log('resp',resp)
+           });
 
 let adminsController = {validate,add,authenticate}
 
@@ -144,9 +181,20 @@ let adminsController = {validate,add,authenticate}
           return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Phone number not exists !'});
         }
 
+        /* Get Admin School */
+        var AdminSchoolObj = await SchoolAdminModel.findOne({ AdminID: AdminObj._id}).select({"_id": 0, "SchoolID" : 1}).limit(1).exec();
+        if(!AdminSchoolObj){
+          return res.status(500).json({ResponseCode: 500, Data: [], Message: 'There is no school assigned yet !'});
+        }
+
+        /* Get Admin School Fees */
+        var AdminSchoolFeesArr = await FeesModel.find({ SchoolID: AdminSchoolObj.SchoolID}).select({"ClassID": 1, "Amount" : 1}).exec();
+
         /* Generate Token */
         let RespObj = {};
-            RespObj.Token = jwt.sign({UserID:UserObj._id, AdminID:AdminObj._id, UserType : 'Admin'}, process.env.TOKEN_SECRET, { expiresIn: '3600s' }); // 60 minutes
+            RespObj.Token = jwt.sign({UserID:UserObj._id, AdminID:AdminObj._id, UserType : 'Admin'}, process.env.TOKEN_SECRET, { expiresIn: '36000s' }); // 600 minutes
+            RespObj.SchoolID = AdminSchoolObj.SchoolID;
+            RespObj.Fees = AdminSchoolFeesArr;
         return res.status(200).json({ResponseCode: 200, Data: RespObj, Message: 'success'});
       } catch (err) {
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
