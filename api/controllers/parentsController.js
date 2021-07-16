@@ -12,6 +12,7 @@ const async = require("async"),
       helper = require('../../lib/helper'),
       datetime = require('../../lib/datetime'),
       request = require('request'),
+      mongoose = require('mongoose'),
       { check, matches,validationResult, matchedData } = require('express-validator');
 
 const {UsersModel} = require("../models/usersModel");
@@ -24,7 +25,7 @@ const {StudentClassModel} = require("../models/studentClassModel");
 /* Require Enviornment File  */
 require('dotenv').config();
 
-let parentsController = {validate,authenticate,update_device_details,fee_initiate,fee_payment_verify}
+let parentsController = {validate,authenticate,update_device_details,fee_initiate,fee_payment_verify,payment_history}
 
   /**
      * For Validation
@@ -71,6 +72,13 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
                 check('PaymentID').notEmpty().withMessage('Payment ID field is required').trim(),
                 check('RazorPayPaymentID').notEmpty().withMessage('RazorPay Payment ID field is required').trim()
               ]
+           }
+           break;
+           case 'payment_history': {
+              return [ 
+                check('Limit').notEmpty().withMessage('Limit field is required').trim(),
+                check('Offset').notEmpty().withMessage('Offset field is required').trim()
+               ]
            }
            break;
         }
@@ -168,7 +176,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
 
         /* Generate Token */
         let RespObj = {};
-            RespObj.Token = jwt.sign({UserID:UserObj._id, ParentID:ParentObj._id, UserType : 'Parent'}, process.env.TOKEN_SECRET, { expiresIn: '3600s' }); // 60 minutes
+            RespObj.Token = jwt.sign({UserID:UserObj._id, ParentID:ParentObj._id, UserType : 'Parent'}, process.env.TOKEN_SECRET, { expiresIn: '36000s' }); // 600 minutes
             RespObj.StudentID = ParentRespObj[0].StudentID;
             RespObj.SchoolID = ParentRespObj[0].SchoolID;
             RespObj.FeeAmount = ParentRespObj[0].Amount;
@@ -335,5 +343,126 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
         }
       });
   }
+
+  /**
+      For Payment History
+  **/
+  async function payment_history(req, res) {
+    
+     /* To Check Validation Results */
+     let errors = validationResult(req);
+     if (!errors.isEmpty()) {
+         res.status(500).json({
+                 ResponseCode: 500,
+                 Data: [],
+                 Message: errors.array()[0].msg
+         });
+         return;
+      }
+
+      let ParentID  = req.body.ParentID;
+
+      /* To Get Parent & Student Details */
+      var ParentRespObj = await ParentsModel.aggregate([
+                            { "$lookup": {
+                                "from": "parent-students",
+                                "localField": "ParentID", // Child Colletion Field
+                                "foreignField": "_id", // Parent Colletion Field
+                                "as": "parentstudents"
+                            } },   
+                            { "$lookup": {
+                                "from": "students",
+                                "localField": "students._id",
+                                "foreignField": "parentstudents.StudentID",
+                                "as": "students"
+                            } },
+                            { "$match": { "_id": mongoose.Types.ObjectId(ParentID)}},
+                            { "$project": {
+                                "_id" : 0,
+                                "Name": 1,
+                                "StudentID" : { "$arrayElemAt" : ["$students._id", 0] },
+                                "StudentName" : { "$arrayElemAt" : ["$students.Name", 0] },
+                            } },
+                            {
+                              "$limit" : 1
+                            }
+                         ]).exec();
+      
+      /* To Check Empty Array */
+      if(ParentRespObj.length === 0){
+        return res.status(500).json({ResponseCode: 500, Data: [], Message: "Data not found !!"});
+      }
+
+      /* To Get Payment History */
+      var PaymentHistory = await PaymentsModel.aggregate([
+                                  { "$lookup": {
+                                      "from": "student-classes",
+                                      "localField": "StudentID",
+                                      "foreignField": "StudentID",
+                                      "as": "studentclasses"
+                                  } },  
+                                  { "$lookup": {
+                                      "from": "school-class-ays",
+                                      "localField": "studentclassesays._id",
+                                      "foreignField": "studentclasses.SchoolClassID",
+                                      "as": "studentclassesays"
+                                  } },  
+                                  { "$lookup": {
+                                      "from": "schools",
+                                      "localField": "schools._id",
+                                      "foreignField": "studentclassesays.SchoolID",
+                                      "as": "schools"
+                                  } },  
+                                  { "$lookup": {
+                                      "from": "fees",
+                                      "localField": "fees._id",
+                                      "foreignField": "FeeID",
+                                      "as": "fees"
+                                  } },  
+                                  { "$match": { "ParentID": (ParentID).toString(), "Status" : {"$in" : ["Failed","Success"]} } },
+                                  { "$project": {
+                                      "PaymentID" : "$_id",
+                                      "Amount" : "$Amount",
+                                      "PaymentDate" : "$createdAt",
+                                      "_id" : 0,
+                                      "Status": 1,
+                                      "FeeID": 1,
+                                      "TransactionID": 1,
+                                      "DueDate" : { "$arrayElemAt" : ["$fees.DueDate", 0] },
+                                      "ClassID" : { "$arrayElemAt" : ["$studentclassesays.ClassID", 0] },
+                                      "SchoolID" : { "$arrayElemAt" : ["$studentclassesays.SchoolID", 0] },
+                                      "SchoolName" : { "$arrayElemAt" : ["$schools.Name", 0] },
+                                      "AcademicYear" : { "$arrayElemAt" : ["$studentclassesays.AcademicYear", 0] },
+                                      "Std" : { "$arrayElemAt" : ["$studentclassesays.Std", 0] },
+                                      "Division" : { "$arrayElemAt" : ["$studentclassesays.Division", 0] },
+                                  } },
+                                  {
+                                    "$sort" : {"PaymentDate" : -1}
+                                  },
+                                  {
+                                    "$limit" : parseInt(req.query.Limit) + parseInt(req.query.Offset),
+                                  },
+                                  {
+                                    "$skip" : parseInt(req.query.Offset),
+                                  }
+                              ]).exec()
+
+      /* To Check Empty Array */
+      if(PaymentHistory.length === 0){
+        return res.status(500).json({ResponseCode: 500, Data: [], Message: "Data not found !!"});
+      }
+
+      /* Response Object */
+      let RespObj = {};
+          RespObj.ParentID = ParentID;
+          RespObj.ParentName = ParentRespObj[0].Name;
+          RespObj.PaymentData = {
+              'StudentID' : (ParentRespObj[0].StudentID).toString(),
+              'StudentName' : ParentRespObj[0].StudentName
+          }
+          RespObj.PaymentData.StudentPayment = PaymentHistory;
+        return res.status(200).json({ResponseCode: 200, Data: RespObj, Message: 'success'});
+  }
+
 
 module.exports = parentsController;
