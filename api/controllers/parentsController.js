@@ -21,7 +21,7 @@ const {StudentsModel} = require("../models/studentsModel");
 const {PaymentsModel} = require("../models/paymentsModel");
 const {ParentStudentModel} = require("../models/parentStudentModel");
 const {StudentClassModel} = require("../models/studentClassModel");
-     
+
 /* Require Enviornment File  */
 require('dotenv').config();
 
