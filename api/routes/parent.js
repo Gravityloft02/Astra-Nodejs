@@ -6,6 +6,10 @@
  * Developed By  : Gravityloft
 */
 
+// MONGO_DB_USER=AstraGravityloft2021
+// +MONGO_DB_PASSWORD=AstraGravityloft2021Delhi
+// +APP_ENV=dev
+
 const express = require('express'),
       router  = express.Router(),
       middleware  = require('../middleware/parentsMiddleware'),

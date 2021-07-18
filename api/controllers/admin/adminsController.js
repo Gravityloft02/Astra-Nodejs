@@ -240,7 +240,7 @@ let adminsController = {validate,add,authenticate, sendNotification}
 
         let ClassDetails = await SchoolClassesModel.findOne({_id : req.body.TargetClassID});
 
-        if(ClassDetails){
+        if(!ClassDetails){
           return res.status(404).json({ResponseCode: 404, Data: [], Message: "Class not found"});
         }
 
