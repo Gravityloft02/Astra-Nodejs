@@ -8,6 +8,7 @@
 
 const async = require("async"),
       jwt = require('jsonwebtoken'),
+      _ = require('underscore'),
       constant = require('../../config/globalConstant'),
       helper = require('../../lib/helper'),
       datetime = require('../../lib/datetime'),
@@ -21,11 +22,12 @@ const {StudentsModel} = require("../models/studentsModel");
 const {PaymentsModel} = require("../models/paymentsModel");
 const {ParentStudentModel} = require("../models/parentStudentModel");
 const {StudentClassModel} = require("../models/studentClassModel");
+const {NotificationsModel} = require("../models/notificationsModel");
 
 /* Require Enviornment File  */
 require('dotenv').config();
 
-let parentsController = {validate,authenticate,update_device_details,fee_initiate,fee_payment_verify,payment_history}
+let parentsController = {validate,authenticate,update_device_details,fee_initiate,fee_payment_verify,payment_history,getNotifications}
 
   /**
      * For Validation
@@ -463,6 +465,61 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
           RespObj.PaymentData.StudentPayment = PaymentHistory;
         return res.status(200).json({ResponseCode: 200, Data: RespObj, Message: 'success'});
   }
+
+    /**
+      For Update Device Details
+  **/
+ async function getNotifications(req, res) {
+    
+  /* To Check Validation Results */
+  let errors = validationResult(req);
+  if (!errors.isEmpty()) {
+      res.status(500).json({
+              ResponseCode: 500,
+              Data: [],
+              Message: errors.array()[0].msg
+      });
+      return;
+  }
+
+  try{
+    let ParentDetails = await ParentsModel.findOne({_id : req.body.ParentID});
+
+    if(ParentDetails){
+      let ParentsStudents = await ParentStudentModel.find({ParentID : ParentDetails._id});
+
+      let student_ids = _.pluck(ParentsStudents, "StudentID");
+      let notifications = await NotificationsModel.find({StudentID : {$in : student_ids}}).select({NotificationSubject : 1, NotificationContent : 1, createdAt : 1, StudentID: 1}).limit(parseInt(req.query.Limit) + parseInt(req.query.Offset)).skip(parseInt(req.query.Offset));
+
+      if(notifications && notifications.length){
+        let notificationsfinal = [];
+        
+        async.each(notifications, async function(notification, callback){
+          let finalstudentids = _.intersection(student_ids, notification.StudentID);
+            let students = await StudentsModel.find({_id : {$in : finalstudentids}}).select({'Name' : 1});
+            let obj = Object.assign(notification._doc, {});
+          
+            obj.students = students;
+            delete obj.StudentID;
+            notificationsfinal.push(obj);
+          
+          return;
+        }, function(err){
+          if(err) return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR}); 
+          return res.status(200).json({ResponseCode : 200, Data : notificationsfinal, Message : "Notification list"});
+        })
+      }else{
+        return res.status(200).json({ResponseCode : 200, Data : [], Message : "No notifications available"})
+      }
+    }else{
+      return res.status(404).json({ResponseCode : 404, Data : [], Message : "Parent not found"})
+    }
+  }catch(err){
+    console.log(err)
+    return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
+  }
+  
+ }
 
 
 module.exports = parentsController;

@@ -11,18 +11,25 @@ const async = require("async"),
       constant = require('../../../config/globalConstant'),
       helper = require('../../../lib/helper'),
       datetime = require('../../../lib/datetime'),
-      { check, matches,validationResult, matchedData } = require('express-validator');
+      notification = require('../../../lib/notification'),
+      { check, matches,validationResult, matchedData } = require('express-validator'),
+      _ = require("underscore");
 
 const {AdminsModel} = require("../../models/adminsModel");
 const {UsersModel} = require("../../models/usersModel");
 const {SchoolAdminModel} = require("../../models/schoolAdminModel");
 const {FeesModel} = require("../../models/feesModel");
 const {SchoolClassesModel} = require("../../models/schoolClassModel");
+const {StudentClassModel} = require("../../models/studentClassModel");
+const {ParentStudentModel} = require("../../models/parentStudentModel");
+const {ParentsModel} = require("../../models/parentsModel");
+const {NotificationsModel} = require("../../models/notificationsModel");
+const {SchoolsModel} = require("../../models/schoolsModel");
 
 /* Require Enviornment File  */
 require('dotenv').config();
 
-let adminsController = {validate,add,authenticate}
+let adminsController = {validate,add,authenticate, sendNotification}
 
   /**
      * For Validation
@@ -197,6 +204,99 @@ let adminsController = {validate,add,authenticate}
             RespObj.Students = StudentsArr;
         return res.status(200).json({ResponseCode: 200, Data: RespObj, Message: 'success'});
       } catch (err) {
+        return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
+      }
+  }
+
+  /* 
+      For Sending Notification From Admin
+  */
+
+  async function sendNotification(req, res) {
+      /* To Check Validation Results */
+      let errors = validationResult(req);
+      if (!errors.isEmpty()) {
+          res.status(500).json({
+                  ResponseCode: 500,
+                  Data: [],
+                  Message: errors.array()[0].msg
+          });
+          return;
+      }
+
+      try{
+
+        if(!req.body.NotificationSubject){
+          return res.status(400).json({ResponseCode: 400, Data: [], Message: "Notification Subject is required"});
+        }
+
+        if(!req.body.NotificationContent){
+          return res.status(400).json({ResponseCode: 400, Data: [], Message: "Notification Content is required"});
+        }
+
+        if(!req.body.TargetClassID){
+          return res.status(400).json({ResponseCode: 400, Data: [], Message: "Target Class ID is required"});
+        }
+
+        let ClassDetails = await SchoolClassesModel.findOne({_id : req.body.TargetClassID});
+
+        if(ClassDetails){
+          return res.status(404).json({ResponseCode: 404, Data: [], Message: "Class not found"});
+        }
+
+        let StudentClass = await StudentClassModel.find({SchoolClassID : req.body.TargetClassID});
+
+        if(StudentClass && StudentClass.length < 0){
+          return res.status(404).json({ResponseCode: 404, Data: [], Message: "No student Associated to this class"});
+        }
+
+        // let SchoolDetails = await SchoolsModel.findOne({_id : ClassDetails.SchoolID});
+
+        let student_ids = _.pluck(StudentClass, "StudentID");
+
+        let ParentStudent = await ParentStudentModel.find({StudentID : {$in : student_ids}});
+
+        if(ParentStudent && ParentStudent.length < 0){
+          return res.status(404).json({ResponseCode: 404, Data: [], Message: "Parent not associated with student"});
+        }
+        
+
+        let parent_ids = _.pluck(ParentStudent, 'ParentID');
+
+        let Parents = await ParentsModel.find({_id : {$in : parent_ids}});
+
+        if(Parents && Parents.length < 0){
+          return res.status(404).json({ResponseCode: 404, Data: [], Message: "No parents available"});
+        }
+
+        let devices = _.pluck(Parents, "DeviceKey");
+
+        notification.sendNotification(req.body, devices);
+
+        let notificationObj = {
+          AdminID: req.body.UserID,
+          TargetClassID: req.body.TargetClassID,
+          NotificationSubject : req.body.NotificationSubject,
+          NotificationContent : req.body.NotificationContent,
+          StudentID : student_ids
+        }
+
+        let notifications = await NotificationsModel.create(notificationObj)
+
+        let response = {
+          SchoolID : ClassDetails.SchoolID,
+          AdminId: req.body.UserID,
+          NotificationId : notifications._id,
+          TargetClassID : req.body.TargetClassID,
+          TargetDivision : ClassDetails.Division,
+          ClassID: ClassDetails.ClassID,
+          NotificationSubject : req.body.NotificationSubject,
+          NotificationContent : req.body.NotificationContent
+        }
+
+        return res.status(200).json({ResponseCode: 200, Data: response, Message : "Notification sent"})
+      }catch(err) {
+        console.log(err)
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }
   }
