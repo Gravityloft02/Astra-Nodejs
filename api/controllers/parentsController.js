@@ -495,13 +495,35 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
         let notificationsfinal = [];
         
         async.each(notifications, async function(notification, callback){
-          let finalstudentids = _.intersection(student_ids, notification.StudentID);
-            let students = await StudentsModel.find({_id : {$in : finalstudentids}}).select({'Name' : 1});
-            let obj = Object.assign(notification._doc, {});
           
-            obj.students = students;
-            delete obj.StudentID;
-            notificationsfinal.push(obj);
+          let notification_date = new Date(notification.createdAt);  // yyyy-mm-dd
+          var month = notification_date.toLocaleString('default', { month: 'long' });
+          let finalstudentids = _.intersection(student_ids, notification.StudentID);
+          let students = await StudentsModel.find({_id : {$in : finalstudentids}}).select({'Name' : 1});
+          let obj = Object.assign(notification._doc, {});
+        
+          obj.students = students;
+          delete obj.StudentID;
+
+          if(notificationsfinal && notificationsfinal.length){
+            let index = notificationsfinal.findIndex(ele => {
+              return ele.Month == month;
+            })
+  
+              if(index != -1){
+                notificationsfinal[index].Notifications.push(obj);
+              }else{
+                notificationsfinal.push({
+                  Month : month,
+                  Notifications : [obj]
+                })
+              }
+          }else{
+            notificationsfinal.push({
+              Month : month,
+              Notifications : [obj]
+            })
+          }
           
           return;
         }, function(err){
