@@ -489,7 +489,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
       let ParentsStudents = await ParentStudentModel.find({ParentID : ParentDetails._id});
 
       let student_ids = _.pluck(ParentsStudents, "StudentID");
-      let notifications = await NotificationsModel.find({StudentID : {$in : student_ids}}).select({NotificationSubject : 1, NotificationContent : 1, createdAt : 1, StudentID: 1}).limit(parseInt(req.query.Limit) + parseInt(req.query.Offset)).skip(parseInt(req.query.Offset));
+      let notifications = await NotificationsModel.find({StudentID : {$in : student_ids}}).select({NotificationSubject : 1, NotificationContent : 1, createdAt : 1, StudentID: 1}).sort({"createdAt": -1}).limit(200);
 
       if(notifications && notifications.length){
         let notificationsfinal = [];
