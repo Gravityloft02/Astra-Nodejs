@@ -12,7 +12,7 @@ const async = require("async"),
       constant = require('../../config/globalConstant'),
       helper = require('../../lib/helper'),
       datetime = require('../../lib/datetime'),
-      request = require('request'),
+      axios = require('axios'),
       mongoose = require('mongoose'),
       { check, matches,validationResult, matchedData } = require('express-validator');
 
@@ -246,12 +246,25 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
                                         "foreignField": "studentclassesays.SchoolID",
                                         "as": "fees"
                                     } },
+                                    { "$lookup": {
+                                        "from": "school-admins",
+                                        "localField": "schooladmins.SchoolID",
+                                        "foreignField": "studentclassesays.SchoolID",
+                                        "as": "schooladmins"
+                                    } },
+                                    { "$lookup": {
+                                        "from": "admins",
+                                        "localField": "admins._id",
+                                        "foreignField": "schooladmins.AdminID",
+                                        "as": "admins"
+                                    } },
                                      // { "$match": { "StudentID": (req.body.StudentID).toString(), "fees.ClassID" : 7} },
                                     { "$match": { "StudentID": (req.body.StudentID).toString()} },
                                     { "$project": {
                                       "_id" : 0,
                                       "Amount" : { "$arrayElemAt" : ["$fees.Amount", 0] },
-                                      "FeeID" : { "$arrayElemAt" : ["$fees._id", 0] }
+                                      "FeeID" : { "$arrayElemAt" : ["$fees._id", 0] },
+                                      "RazorPayRouteAccountID" : { "$arrayElemAt" : ["$admins.RazorPayRouteAccountID", 0] }
                                     } },
                                     {
                                       "$limit" : 1
@@ -265,6 +278,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
           PaymentData.Amount    = req.body.Amount;
           PaymentData.Status    = "Pending";
           PaymentData.FeeID = StudentFeeObj[0].FeeID;
+          PaymentData.PaidToAccountID = StudentFeeObj[0].RazorPayRouteAccountID;
       let PaymentsModelObj = new PaymentsModel(PaymentData);
       let Payment = await PaymentsModelObj.save();
       if(Payment._id){
@@ -291,7 +305,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
       }
 
       /* Check Payment Status */
-      var PaymentObj = await PaymentsModel.findOne({ _id: req.body.PaymentID}).select({"_id": 1, "Status" : 1, "TransactionID" : 1, "Amount" : 1, "StudentID" : 1}).limit(1).exec();
+      var PaymentObj = await PaymentsModel.findOne({ _id: req.body.PaymentID}).select({"_id": 1, "Status" : 1, "TransactionID" : 1, "Amount" : 1, "StudentID" : 1, "PaidToAccountID" : 1}).limit(1).exec();
       if(!PaymentObj){
         return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Invalid Payment ID !'});
       }
@@ -317,33 +331,52 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
       }
 
       /* Fetch RazorPay Payment Details */
-      var options = {
-        'method': 'GET',
-        'url': constant.RAZORPAY_API_BASE_URL + 'payments/' + req.body.RazorPayPaymentID,
-        'headers': {
-          'Authorization': "Basic " + new Buffer(process.env.RAZORPAY_KEY_ID + ":" + process.env.RAZORPAY_SECRET_KEY).toString("base64"),
-        }
+      var RazorPayHeaders = {'Content-Type': 'application/json', 'Authorization': "Basic " + new Buffer(process.env.RAZORPAY_KEY_ID + ":" + process.env.RAZORPAY_SECRET_KEY).toString("base64")};
+      var config = {
+        method: 'GET',
+        url: constant.RAZORPAY_API_BASE_URL + 'payments/' + req.body.RazorPayPaymentID,
+        headers: RazorPayHeaders,
+        data : {}
       };
-      request(options, async function (error, response) {
-        if (error) throw new Error(error);
-        let RespObj = JSON.parse(response.body);
-        if(RespObj.error){
-          return res.status(500).json({ResponseCode: 500, Data: [], Message: RespObj.error.description});
-        }
+      try {
+        var RazorPayRespObj = await axios(config);
+            RazorPayRespObj = RazorPayRespObj.data;
+      } catch (error) {
+        console.log('Fetch RazorPay payment details error',error);
+        return res.status(500).json({ResponseCode: 500, Data: [], Message: error.message});
+      }
 
-        /* Update Payment  Details */
-        var AmountPaidRP = (RespObj.amount/100);
-        let PayemntStatus = (RespObj.status === 'captured') ? "Success" : "Failed";
-        if(PayemntStatus === 'Success'){
-          AmountPaid = AmountPaid + AmountPaidRP;
-        }
+      /* Update Payment  Details */
+      var UpdatePayemntObj = { TransactionID: RazorPayRespObj.id, RazorPayJsonResponse : RazorPayRespObj};
+      var AmountPaidRP = (RazorPayRespObj.amount/100);
+      let PayemntStatus = (RazorPayRespObj.status === 'captured') ? "Success" : "Failed";
+          UpdatePayemntObj.Status = PayemntStatus;
+      if(PayemntStatus === 'Success'){
+        AmountPaid = AmountPaid + AmountPaidRP;
+
+        /* Transfer Amount To Route Account */
+        var config = {
+          method: 'POST',
+          url: constant.RAZORPAY_API_BASE_URL + 'payments/' + req.body.RazorPayPaymentID + '/transfers',
+          headers: RazorPayHeaders,
+          data : {"transfers" : [{"account" : PaymentObj.PaidToAccountID, "amount" : RazorPayRespObj.amount, "currency" : "INR", "notes" : {"Comment" : "Astra student fees"}}]}
+        };
         try {
-          var ParentObj = await PaymentsModel.findOneAndUpdate({ _id: req.body.PaymentID},{ TransactionID: RespObj.id, RazorPayJsonResponse : RespObj, Status : PayemntStatus},{upsert:false, rawResult:true});
-          return res.status(200).json({ResponseCode: 200, Data: {PayemntStatus:PayemntStatus,TransactionID:RespObj.id, AmountPaid : AmountPaidRP, TotalFeePaid : AmountPaid}, Message: 'success'});
-        } catch (err) {
-          return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
+          var RazorPayRespObj = await axios(config);
+              UpdatePayemntObj.TransferPaymentRazorPayRouteJsonResponse = RazorPayRespObj.data;
+        } catch (error) {
+          console.log('FTransfer RazorPay Payemnt error',error);
+          return res.status(500).json({ResponseCode: 500, Data: [], Message: error.message});
         }
-      });
+      }
+
+      try {
+        var ParentObj = await PaymentsModel.findOneAndUpdate({ _id: req.body.PaymentID}, UpdatePayemntObj,{upsert:false, rawResult:true});
+        return res.status(200).json({ResponseCode: 200, Data: {PayemntStatus:PayemntStatus,TransactionID:UpdatePayemntObj.TransactionID, AmountPaid : AmountPaidRP, TotalFeePaid : AmountPaid}, Message: 'success'});
+      } catch (err) {
+        console.log('err',err)
+        return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
+      }
   }
 
   /**

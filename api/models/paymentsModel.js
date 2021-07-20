@@ -12,6 +12,7 @@ const paymentsSchema = new Schema({
     TransactionID: { type: String, required: false},
     PaidToAccountID: { type: String, required: false},
     RazorPayJsonResponse: { type: Object, required: false},
+    TransferPaymentRazorPayRouteJsonResponse: { type: Object, required: false},
     FeeID: { type: String, required: true },	
     ParentID: { type: String, required: true },
     StudentID: { type: String, required: true },
