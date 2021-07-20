@@ -144,6 +144,17 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
                                   "foreignField": "studentclassesays.SchoolID",
                                   "as": "fees"
                               } },
+                              { "$lookup": {
+                                  "from": "parent-students",
+                                  "localField": "parentstudents.StudentID",
+                                  "foreignField": "studentclasses.StudentID",
+                                  "as": "parentstudents"
+                              } },{ "$lookup": {
+                                  "from": "parents",
+                                  "localField": "parents._id",
+                                  "foreignField": "parentstudents.ParentID",
+                                  "as": "parents"
+                              } },
                               // { "$match": { "ParentID": (ParentObj._id).toString(), "fees.ClassID" : 7} },
                               { "$match": { "ParentID": (ParentObj._id).toString()}},
                               { "$project": {
@@ -151,7 +162,8 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
                                   "StudentID": 1,
                                   "SchoolID" : { "$arrayElemAt" : ["$studentclassesays.SchoolID", 0] },
                                   "Amount" : { "$arrayElemAt" : ["$fees.Amount", 0] },
-                                  "DueDate" : { "$arrayElemAt" : ["$fees.DueDate", 0] }
+                                  "DueDate" : { "$arrayElemAt" : ["$fees.DueDate", 0] },
+                                  "ParentName" : { "$arrayElemAt" : ["$parents.Name", 0] }
                               } },
                               {
                                 "$limit" : 1
@@ -183,6 +195,8 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
             RespObj.SchoolID = ParentRespObj[0].SchoolID;
             RespObj.FeeAmount = ParentRespObj[0].Amount;
             RespObj.DueDate = ParentRespObj[0].DueDate;
+            RespObj.ParentName = ParentRespObj[0].ParentName;
+            RespObj.HelpContactNo = '+91-8080808080';
             RespObj.AmountPaid = (AmountObj.length === 0) ? 0 : AmountObj[0].total;
         return res.status(200).json({ResponseCode: 200, Data: RespObj, Message: 'success'});
       } catch (err) {
@@ -282,7 +296,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
       let PaymentsModelObj = new PaymentsModel(PaymentData);
       let Payment = await PaymentsModelObj.save();
       if(Payment._id){
-        return res.status(200).json({ResponseCode: 200, Data: {PaymentID:Payment._id, RazorPayKeyID : process.env.RAZORPAY_KEY_ID}, Message: 'success.'});
+        return res.status(200).json({ResponseCode: 200, Data: {PaymentID:Payment._id, RazorPayKeyID : process.env.RAZORPAY_KEY_ID, AppLogo : process.env.APP_DIR_BASE_URL + 'assets/logo.png'}, Message: 'success.'});
       }else{
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }
