@@ -10,7 +10,8 @@ const mongoose   = require('mongoose'),
 
 const notificationsSchema = new Schema({
     AdminID: { type: String, required: true },
-    TargetClassID: { type: String, required: true },
+    TargetClassID: [{ type: String, required: true }],
+    SchoolID: { type: String, required: true },
     NotificationSubject : {type : String, required: true},
     NotificationContent : {type : String, required: true},
     StudentID : [{type : String, required: true, ref : "Students"}]

@@ -514,7 +514,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
   }
 
     /**
-      For Update Device Details
+      For Get Notifications
   **/
  async function getNotifications(req, res) {
     

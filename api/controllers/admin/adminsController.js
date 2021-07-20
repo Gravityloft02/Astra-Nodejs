@@ -29,7 +29,7 @@ const {SchoolsModel} = require("../../models/schoolsModel");
 /* Require Enviornment File  */
 require('dotenv').config();
 
-let adminsController = {validate,add,authenticate, sendNotification}
+let adminsController = {validate,add,authenticate, sendNotification, getNotifications}
 
   /**
      * For Validation
@@ -234,20 +234,27 @@ let adminsController = {validate,add,authenticate, sendNotification}
           return res.status(400).json({ResponseCode: 400, Data: [], Message: "Notification Content is required"});
         }
 
-        if(!req.body.TargetClassID){
+        if(req.body.TargetClassID && req.body.TargetClassID.length < 0){
           return res.status(400).json({ResponseCode: 400, Data: [], Message: "Target Class ID is required"});
         }
 
-        let ClassDetails = await SchoolClassesModel.findOne({_id : req.body.TargetClassID});
-
-        if(!ClassDetails){
-          return res.status(404).json({ResponseCode: 404, Data: [], Message: "Class not found"});
+        if(!req.body.SchoolID){
+          return res.status(400).json({ResponseCode: 400, Data: [], Message: "School ID is required"});
         }
 
-        let StudentClass = await StudentClassModel.find({SchoolClassID : req.body.TargetClassID});
+        // let ClassDetails = await SchoolClassesModel.findOne({_id : req.body.TargetClassID});
+        let ClassDetails = await SchoolClassesModel.find({ClassID : {$in : req.body.TargetClassID}, SchoolID : req.body.SchoolID});
+        
+        if(ClassDetails && ClassDetails.length <= 0){
+          return res.status(404).json({ResponseCode: 404, Data: [], Message: "Student not found for this classes"});
+        }
 
-        if(StudentClass && StudentClass.length < 0){
-          return res.status(404).json({ResponseCode: 404, Data: [], Message: "No student Associated to this class"});
+        let ClassIDs = _.pluck(ClassDetails, '_id');
+
+        let StudentClass = await StudentClassModel.find({SchoolClassID : {$in : ClassIDs}});
+
+        if(StudentClass && StudentClass.length <= 0){
+          return res.status(404).json({ResponseCode: 404, Data: [], Message: "Student not found for this classes"});
         }
 
         // let SchoolDetails = await SchoolsModel.findOne({_id : ClassDetails.SchoolID});
@@ -256,16 +263,15 @@ let adminsController = {validate,add,authenticate, sendNotification}
 
         let ParentStudent = await ParentStudentModel.find({StudentID : {$in : student_ids}});
 
-        if(ParentStudent && ParentStudent.length < 0){
+        if(ParentStudent && ParentStudent.length <- 0){
           return res.status(404).json({ResponseCode: 404, Data: [], Message: "Parent not associated with student"});
         }
         
-
         let parent_ids = _.pluck(ParentStudent, 'ParentID');
 
         let Parents = await ParentsModel.find({_id : {$in : parent_ids}});
 
-        if(Parents && Parents.length < 0){
+        if(Parents && Parents.length <= 0){
           return res.status(404).json({ResponseCode: 404, Data: [], Message: "No parents available"});
         }
 
@@ -276,6 +282,7 @@ let adminsController = {validate,add,authenticate, sendNotification}
         let notificationObj = {
           AdminID: req.body.UserID,
           TargetClassID: req.body.TargetClassID,
+          SchoolID : req.body.SchoolID,
           NotificationSubject : req.body.NotificationSubject,
           NotificationContent : req.body.NotificationContent,
           StudentID : student_ids
@@ -284,12 +291,12 @@ let adminsController = {validate,add,authenticate, sendNotification}
         let notifications = await NotificationsModel.create(notificationObj)
 
         let response = {
-          SchoolID : ClassDetails.SchoolID,
+          SchoolID : req.body.SchoolID,
           AdminId: req.body.UserID,
           NotificationId : notifications._id,
           TargetClassID : req.body.TargetClassID,
-          TargetDivision : ClassDetails.Division,
-          ClassID: ClassDetails.ClassID,
+          TargetDivision : _.pluck(ClassDetails, "Division"), //ClassDetails.Division,
+          ClassID: ClassIDs,
           NotificationSubject : req.body.NotificationSubject,
           NotificationContent : req.body.NotificationContent
         }
@@ -300,6 +307,41 @@ let adminsController = {validate,add,authenticate, sendNotification}
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }
   }
+
+      /**
+      For Get Notifications
+  **/
+ async function getNotifications(req, res) {
+    
+  /* To Check Validation Results */
+  let errors = validationResult(req);
+  if (!errors.isEmpty()) {
+      res.status(500).json({
+              ResponseCode: 500,
+              Data: [],
+              Message: errors.array()[0].msg
+      });
+      return;
+  }
+
+  try{
+
+      let limit = req.query.Limit? Number(req.query.Limit) : 50; 
+      let offset = req.query.Offset? Number(req.query.Offset) : 0; 
+
+      let notifications = await NotificationsModel.find({AdminID : req.body.UserID}).select({NotificationSubject : 1, NotificationContent : 1, createdAt : 1}).sort({"createdAt": -1}).limit(limit).skip(offset);
+
+      if(notifications && notifications.length){
+          return res.status(200).json({ResponseCode : 200, Data : notifications, Message : "Notification list"});
+      }else{
+        return res.status(200).json({ResponseCode : 200, Data : [], Message : "No notifications available"})
+      }
+    
+  }catch(err){
+    return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
+  }
+  
+ }
 
 
 module.exports = adminsController;
