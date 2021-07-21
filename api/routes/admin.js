@@ -22,6 +22,7 @@ const express = require('express'),
       router.post('/admin/add',admins.validate('add'),admins.add);
       router.post('/authenticate',admins.validate('authenticate'),admins.authenticate);
       router.post('/send-notification', middleware.verifyToken,admins.sendNotification);
+      router.get('/get-notification', middleware.verifyToken,admins.getNotifications);
 
       /* Parents Routings */
       router.post('/parent/add',parents.validate('add'),parents.add);
