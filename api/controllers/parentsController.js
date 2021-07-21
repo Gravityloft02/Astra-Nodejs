@@ -307,10 +307,11 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
           PaymentData.Status    = "Pending";
           PaymentData.FeeID = StudentFeeObj[0].FeeID;
           PaymentData.PaidToAccountID = StudentFeeObj[0].RazorPayRouteAccountID;
+          PaymentData.RazorPayOrderID = RazorPayOrderObj.data.id;
       let PaymentsModelObj = new PaymentsModel(PaymentData);
       let Payment = await PaymentsModelObj.save();
       if(Payment._id){
-        return res.status(200).json({ResponseCode: 200, Data: {PaymentID:Payment._id, RazorPayOrderID : RazorPayOrderObj.id, RazorPayKeyID : process.env.RAZORPAY_KEY_ID, AppLogo : process.env.APP_DIR_BASE_URL + 'assets/logo.png'}, Message: 'success.'});
+        return res.status(200).json({ResponseCode: 200, Data: {PaymentID:Payment._id, RazorPayOrderID : PaymentData.RazorPayOrderID, RazorPayKeyID : process.env.RAZORPAY_KEY_ID, AppLogo : process.env.APP_DIR_BASE_URL + 'assets/logo.png'}, Message: 'success.'});
       }else{
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }
@@ -333,7 +334,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
       }
 
       /* Check Payment Status */
-      var PaymentObj = await PaymentsModel.findOne({ _id: req.body.PaymentID}).select({"_id": 1, "Status" : 1, "TransactionID" : 1, "Amount" : 1, "StudentID" : 1, "PaidToAccountID" : 1}).limit(1).exec();
+      var PaymentObj = await PaymentsModel.findOne({ _id: req.body.PaymentID}).select({"_id": 1, "Status" : 1, "TransactionID" : 1, "Amount" : 1, "StudentID" : 1, "PaidToAccountID" : 1, "RazorPayOrderID" : 1}).limit(1).exec();
       if(!PaymentObj){
         return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Invalid Payment ID !'});
       }
@@ -372,6 +373,23 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
       } catch (error) {
         console.log('Fetch RazorPay payment details error',error);
         return res.status(500).json({ResponseCode: 500, Data: [], Message: error.message});
+      }
+
+      /* Capture Payment */
+      if(RazorPayRespObj.status === 'authorized'){
+        var config = {
+          method: 'POST',
+          url: constant.RAZORPAY_API_BASE_URL + 'payments/' + req.body.RazorPayPaymentID + '/capture',
+          headers: RazorPayHeaders,
+          data : {"amount" : RazorPayRespObj.amount, "currency" : "INR"}
+        };
+        try {
+          var RazorPayRespObj = await axios(config);
+              RazorPayRespObj = RazorPayRespObj.data;
+        } catch (error) {
+          console.log('Captured RazorPay payment details error',error);
+          return res.status(500).json({ResponseCode: 500, Data: [], Message: error.message});
+        }
       }
 
       /* Update Payment  Details */
