@@ -290,7 +290,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
           method: 'POST',
           url: constant.RAZORPAY_API_BASE_URL + 'orders',
           headers: {'Content-Type': 'application/json', 'Authorization': "Basic " + new Buffer(process.env.RAZORPAY_KEY_ID + ":" + process.env.RAZORPAY_SECRET_KEY).toString("base64")},
-          data : {"amount" : Amount * 100, currency : "INR", "receipt" : "receipt#1"}
+          data : {"amount" : req.body.Amount * 100, currency : "INR", "receipt" : "receipt#1"}
         };
         try {
           var RazorPayOrderObj = await axios(config);
