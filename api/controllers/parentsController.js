@@ -285,6 +285,20 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
                                     }
                                 ]).exec();
 
+      /* Create Order On Razorpay */
+      var config = {
+          method: 'POST',
+          url: constant.RAZORPAY_API_BASE_URL + 'orders',
+          headers: {'Content-Type': 'application/json', 'Authorization': "Basic " + new Buffer(process.env.RAZORPAY_KEY_ID + ":" + process.env.RAZORPAY_SECRET_KEY).toString("base64")},
+          data : {"amount" : Amount * 100, currency : "INR", "receipt" : "receipt#1"}
+        };
+        try {
+          var RazorPayOrderObj = await axios(config);
+        } catch (error) {
+          console.log('Create Order RazorPay Payemnt error',error);
+          return res.status(500).json({ResponseCode: 500, Data: [], Message: error.message});
+        }
+
       /* Save Payment */
       let PaymentData = {};
           PaymentData.StudentID = req.body.StudentID;
@@ -296,7 +310,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
       let PaymentsModelObj = new PaymentsModel(PaymentData);
       let Payment = await PaymentsModelObj.save();
       if(Payment._id){
-        return res.status(200).json({ResponseCode: 200, Data: {PaymentID:Payment._id, RazorPayKeyID : process.env.RAZORPAY_KEY_ID, AppLogo : process.env.APP_DIR_BASE_URL + 'assets/logo.png'}, Message: 'success.'});
+        return res.status(200).json({ResponseCode: 200, Data: {PaymentID:Payment._id, RazorPayOrderID : RazorPayOrderObj.id, RazorPayKeyID : process.env.RAZORPAY_KEY_ID, AppLogo : process.env.APP_DIR_BASE_URL + 'assets/logo.png'}, Message: 'success.'});
       }else{
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }
