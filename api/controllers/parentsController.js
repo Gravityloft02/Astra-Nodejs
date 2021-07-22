@@ -23,6 +23,8 @@ const {PaymentsModel} = require("../models/paymentsModel");
 const {ParentStudentModel} = require("../models/parentStudentModel");
 const {StudentClassModel} = require("../models/studentClassModel");
 const {NotificationsModel} = require("../models/notificationsModel");
+const {SchoolClassesModel} = require("../models/schoolClassModel");
+const {FeesModel} = require("../models/feesModel");
 
 /* Require Enviornment File  */
 require('dotenv').config();
@@ -115,7 +117,8 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
         }
 
         /* Check Entry In Parents */
-        var ParentObj = await ParentsModel.findOne({ Phone: req.body.Phone}).select({"_id": 1}).limit(1).exec();
+        var ParentObj = await ParentsModel.findOne({ Phone: req.body.Phone}).select({"_id": 1, "Name" : 1}).limit(1).exec();
+        
         if(!ParentObj){
           return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Phone number not exists !'});
         }
@@ -123,61 +126,75 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
         /* To Update Device Details (Background Process) */
         await ParentsModel.updateOne({ _id: ParentObj._id},{ DeviceType: req.body.DeviceType, DeviceKey: req.body.DeviceKey},{upsert:false, rawResult:true});
 
-        /* To Get Response Details */
-        var ParentRespObj = await ParentStudentModel.aggregate([
-                              { "$lookup": {
-                                  "from": "student-classes",
-                                  "localField": "StudentID",
-                                  "foreignField": "StudentID",
-                                  "as": "studentclasses"
-                              } },    
-                              { "$unwind": "$studentclasses" },
-                              { "$lookup": {
-                                  "from": "school-class-ays",
-                                  "localField": "studentclassesays._id",
-                                  "foreignField": "studentclasses.SchoolClassID",
-                                  "as": "studentclassesays"
-                              } },
-                              { "$lookup": {
-                                  "from": "fees",
-                                  "localField": "fees.SchoolID",
-                                  "foreignField": "studentclassesays.SchoolID",
-                                  "as": "fees"
-                              } },
-                              { "$lookup": {
-                                  "from": "parent-students",
-                                  "localField": "parentstudents.StudentID",
-                                  "foreignField": "studentclasses.StudentID",
-                                  "as": "parentstudents"
-                              } },{ "$lookup": {
-                                  "from": "parents",
-                                  "localField": "parents._id",
-                                  "foreignField": "parentstudents.ParentID",
-                                  "as": "parents"
-                              } },
-                              // { "$match": { "ParentID": (ParentObj._id).toString(), "fees.ClassID" : 7} },
-                              { "$match": { "ParentID": (ParentObj._id).toString()}},
-                              { "$project": {
-                                  "_id" : 0,
-                                  "StudentID": 1,
-                                  "SchoolID" : { "$arrayElemAt" : ["$studentclassesays.SchoolID", 0] },
-                                  "Amount" : { "$arrayElemAt" : ["$fees.Amount", 0] },
-                                  "DueDate" : { "$arrayElemAt" : ["$fees.DueDate", 0] },
-                                  "ParentName" : { "$arrayElemAt" : ["$parents.Name", 0] }
-                              } },
-                              {
-                                "$limit" : 1
-                              }
-                           ]).exec();
 
-        /* To Check Empty Array */
-        if(ParentRespObj.length === 0){
-          return res.status(500).json({ResponseCode: 500, Data: [], Message: "Data not found !!"});
-        }
+        let parentStudent = await ParentStudentModel.findOne({"ParentID": (ParentObj._id).toString()});
+
+        let studentClass = await StudentClassModel.findOne({StudentID : parentStudent.StudentID});
+
+        let SchoolClassesAy = await SchoolClassesModel.findOne({_id : studentClass.SchoolClassID});
+
+        let fees = await FeesModel.findOne({SchoolID: SchoolClassesAy.SchoolID});
+
+        // let parentStudent = await ParentStudentModel.findOne({"StudentID": (studentClass.StudentID).toString()});
+
+
+        /* To Get Response Details */
+        // var ParentRespObj = await ParentStudentModel.aggregate([
+        //                       { "$lookup": {
+        //                           "from": "student-classes",
+        //                           "localField": "StudentID",
+        //                           "foreignField": "StudentID",
+        //                           "as": "studentclasses"
+        //                       } },    
+        //                       { "$unwind": "$studentclasses" },
+        //                       { "$lookup": {
+        //                           "from": "school-class-ays",
+        //                           "localField": "studentclassesays._id",
+        //                           "foreignField": "studentclasses.SchoolClassID",
+        //                           "as": "studentclassesays"
+        //                       } },
+        //                       { "$lookup": {
+        //                           "from": "fees",
+        //                           "localField": "fees.SchoolID",
+        //                           "foreignField": "studentclassesays.SchoolID",
+        //                           "as": "fees"
+        //                       } },
+        //                       { "$lookup": {
+        //                           "from": "parent-students",
+        //                           "localField": "parentstudents.StudentID",
+        //                           "foreignField": "studentclasses.StudentID",
+        //                           "as": "parentstudents"
+        //                       } },{ "$lookup": {
+        //                           "from": "parents",
+        //                           "localField": "parents._id",
+        //                           "foreignField": "parentstudents.ParentID",
+        //                           "as": "parents"
+        //                       } },
+        //                       // { "$match": { "ParentID": (ParentObj._id).toString(), "fees.ClassID" : 7} },
+        //                       { "$match": { "ParentID": (ParentObj._id).toString()}},
+        //                       { "$project": {
+        //                           "_id" : 0,
+        //                           "StudentID": 1,
+        //                           "SchoolID" : { "$arrayElemAt" : ["$studentclassesays.SchoolID", 0] },
+        //                           "Amount" : { "$arrayElemAt" : ["$fees.Amount", 0] },
+        //                           "DueDate" : { "$arrayElemAt" : ["$fees.DueDate", 0] },
+        //                           "ParentName" : { "$arrayElemAt" : ["$parents.Name", 0] }
+        //                       } },
+        //                       {
+        //                         "$limit" : 1
+        //                       }
+        //                    ]).exec();
+
+                           
+
+        // /* To Check Empty Array */
+        // if(ParentRespObj.length === 0){
+        //   return res.status(500).json({ResponseCode: 500, Data: [], Message: "Data not found !!"});
+        // }
 
         /* Fetch Paid Amount Details */
         var AmountObj = await PaymentsModel.aggregate([
-                                { "$match": { "StudentID": (ParentRespObj[0].StudentID).toString(), "Status" : "Success"}},
+                                { "$match": { "StudentID": (parentStudent.StudentID).toString(), "Status" : "Success"}},
                                 {
                                     $group : {
                                         _id : null,
@@ -191,11 +208,11 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
         /* Generate Token */
         let RespObj = {};
             RespObj.Token = jwt.sign({UserID:UserObj._id, ParentID:ParentObj._id, UserType : 'Parent'}, process.env.TOKEN_SECRET, { expiresIn: '36000s' }); // 600 minutes
-            RespObj.StudentID = ParentRespObj[0].StudentID;
-            RespObj.SchoolID = ParentRespObj[0].SchoolID;
-            RespObj.FeeAmount = ParentRespObj[0].Amount;
-            RespObj.DueDate = ParentRespObj[0].DueDate;
-            RespObj.ParentName = ParentRespObj[0].ParentName;
+            RespObj.StudentID = parentStudent.StudentID;
+            RespObj.SchoolID = SchoolClassesAy.SchoolID;
+            RespObj.FeeAmount = fees.Amount;
+            RespObj.DueDate = fees.DueDate;
+            RespObj.ParentName = ParentObj.Name;
             RespObj.HelpContactNo = '+91-8080808080';
             RespObj.AmountPaid = (AmountObj.length === 0) ? 0 : AmountObj[0].total;
         return res.status(200).json({ResponseCode: 200, Data: RespObj, Message: 'success'});
