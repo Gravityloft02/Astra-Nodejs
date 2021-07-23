@@ -130,8 +130,10 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
         let parentStudent = await ParentStudentModel.findOne({ParentID : ParentObj._id});
 
         let studentClass = await StudentClassModel.findOne({StudentID : parentStudent.StudentID});
+        console.log('studentClass',studentClass)
 
         let SchoolClassesAy = await SchoolClassesModel.findOne({_id : studentClass.SchoolClassID});
+        console.log('SchoolClassesAy',SchoolClassesAy)
 
         let fees = await FeesModel.findOne({SchoolID: SchoolClassesAy.SchoolID});
 
@@ -434,6 +436,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
         return res.status(500).json({ResponseCode: 500, Data: [], Message: "Data not found !!"});
       }
 
+      console.log('ParentRespObj[0].StudentID',ParentRespObj[0].StudentID)
       let studentClass = await StudentClassModel.findOne({StudentID : (ParentRespObj[0].StudentID).toString()});
       console.log('studentClass',studentClass)
 
