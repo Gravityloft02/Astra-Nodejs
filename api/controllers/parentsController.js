@@ -434,9 +434,11 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
         return res.status(500).json({ResponseCode: 500, Data: [], Message: "Data not found !!"});
       }
 
-      let studentClass = await StudentClassModel.findOne({StudentID : ParentRespObj[0].StudentID});
+      let studentClass = await StudentClassModel.findOne({StudentID : (ParentRespObj[0].StudentID).toString()});
+      console.log('studentClass',studentClass)
 
       let SchoolClassesAy = await SchoolClassesModel.findOne({_id : mongoose.Types.ObjectId(studentClass.SchoolClassID)});
+      console.log('SchoolClassesAy',SchoolClassesAy)
 
       let fees = await FeesModel.findOne({SchoolID: SchoolClassesAy.SchoolID});
 
