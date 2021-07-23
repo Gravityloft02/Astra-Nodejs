@@ -127,7 +127,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
         await ParentsModel.updateOne({ _id: ParentObj._id},{ DeviceType: req.body.DeviceType, DeviceKey: req.body.DeviceKey},{upsert:false, rawResult:true});
 
 
-        let parentStudent = await ParentStudentModel.findOne({"ParentID": (ParentObj._id).toString()});
+        let parentStudent = await ParentStudentModel.findOne({ParentID : ParentObj._id});
 
         let studentClass = await StudentClassModel.findOne({StudentID : parentStudent.StudentID});
 
@@ -436,7 +436,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
 
       let studentClass = await StudentClassModel.findOne({StudentID : ParentRespObj[0].StudentID});
 
-      let SchoolClassesAy = await SchoolClassesModel.findOne({_id : studentClass.SchoolClassID});
+      let SchoolClassesAy = await SchoolClassesModel.findOne({_id : mongoose.Types.ObjectId(studentClass.SchoolClassID)});
 
       let fees = await FeesModel.findOne({SchoolID: SchoolClassesAy.SchoolID});
 
