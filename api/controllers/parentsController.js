@@ -434,15 +434,17 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
                               "$limit" : 1
                             }
                          ]).exec();
-      
-      /* To Check Empty Array */
-      if(ParentRespObj.length === 0){
-        return res.status(500).json({ResponseCode: 500, Data: [], Message: "Data not found !!"});
-      }
+
+      let ParentRespObj = await ParentsModel.findOne({_id : mongoose.Types.ObjectId(ParentID)});
       console.log('ParentRespObj',ParentRespObj)
 
-      console.log('ParentRespObj[0].StudentID',ParentRespObj[0].StudentID)
-      let studentClass = await StudentClassModel.findOne({StudentID : (ParentRespObj[0].StudentID).toString()});
+      let ParentStudentRespObj = await ParentStudentModel.findOne({ParentID : ParentRespObj._id});
+      console.log('ParentStudentRespObj',ParentStudentRespObj)
+
+      let StudentRespObj = await StudentsModel.findOne({_id : mongoose.Types.ObjectId(ParentStudentRespObj.StudentID)});
+      console.log('StudentRespObj',StudentRespObj)
+
+      let studentClass = await StudentClassModel.findOne({StudentID : ParentStudentRespObj.StudentID});
       console.log('studentClass',studentClass)
 
       let SchoolClassesAy = await SchoolClassesModel.findOne({_id : mongoose.Types.ObjectId(studentClass.SchoolClassID)});
@@ -511,7 +513,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
 
       /* Fetch Paid Amount Details */
       var AmountObj = await PaymentsModel.aggregate([
-                            { "$match": { "StudentID": (ParentRespObj[0].StudentID).toString(), "Status" : "Success"}},
+                            { "$match": { "StudentID": (ParentStudentRespObj.StudentID).toString(), "Status" : "Success"}},
                             {
                                 $group : {
                                     _id : null,
@@ -525,12 +527,12 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
       /* Response Object */
       let RespObj = {};
           RespObj.ParentID = ParentID;
-          RespObj.ParentName = ParentRespObj[0].Name;
+          RespObj.ParentName = ParentRespObj.Name;
           RespObj.FeeAmount = fees.Amount;
           RespObj.AmountPaid = (AmountObj.length === 0) ? 0 : AmountObj[0].total;
           RespObj.PaymentData = {
-              'StudentID' : (ParentRespObj[0].StudentID).toString(),
-              'StudentName' : ParentRespObj[0].StudentName
+              'StudentID' : (ParentStudentRespObj.StudentID).toString(),
+              'StudentName' : StudentRespObj.StudentName
           }
           RespObj.PaymentData.StudentPayment = PaymentHistory;
         return res.status(200).json({ResponseCode: 200, Data: RespObj, Message: 'success'});
