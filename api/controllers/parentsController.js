@@ -135,63 +135,6 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
 
         let fees = await FeesModel.findOne({SchoolID: SchoolClassesAy.SchoolID});
 
-        // let parentStudent = await ParentStudentModel.findOne({"StudentID": (studentClass.StudentID).toString()});
-
-
-        /* To Get Response Details */
-        // var ParentRespObj = await ParentStudentModel.aggregate([
-        //                       { "$lookup": {
-        //                           "from": "student-classes",
-        //                           "localField": "StudentID",
-        //                           "foreignField": "StudentID",
-        //                           "as": "studentclasses"
-        //                       } },    
-        //                       { "$unwind": "$studentclasses" },
-        //                       { "$lookup": {
-        //                           "from": "school-class-ays",
-        //                           "localField": "studentclassesays._id",
-        //                           "foreignField": "studentclasses.SchoolClassID",
-        //                           "as": "studentclassesays"
-        //                       } },
-        //                       { "$lookup": {
-        //                           "from": "fees",
-        //                           "localField": "fees.SchoolID",
-        //                           "foreignField": "studentclassesays.SchoolID",
-        //                           "as": "fees"
-        //                       } },
-        //                       { "$lookup": {
-        //                           "from": "parent-students",
-        //                           "localField": "parentstudents.StudentID",
-        //                           "foreignField": "studentclasses.StudentID",
-        //                           "as": "parentstudents"
-        //                       } },{ "$lookup": {
-        //                           "from": "parents",
-        //                           "localField": "parents._id",
-        //                           "foreignField": "parentstudents.ParentID",
-        //                           "as": "parents"
-        //                       } },
-        //                       // { "$match": { "ParentID": (ParentObj._id).toString(), "fees.ClassID" : 7} },
-        //                       { "$match": { "ParentID": (ParentObj._id).toString()}},
-        //                       { "$project": {
-        //                           "_id" : 0,
-        //                           "StudentID": 1,
-        //                           "SchoolID" : { "$arrayElemAt" : ["$studentclassesays.SchoolID", 0] },
-        //                           "Amount" : { "$arrayElemAt" : ["$fees.Amount", 0] },
-        //                           "DueDate" : { "$arrayElemAt" : ["$fees.DueDate", 0] },
-        //                           "ParentName" : { "$arrayElemAt" : ["$parents.Name", 0] }
-        //                       } },
-        //                       {
-        //                         "$limit" : 1
-        //                       }
-        //                    ]).exec();
-
-                           
-
-        // /* To Check Empty Array */
-        // if(ParentRespObj.length === 0){
-        //   return res.status(500).json({ResponseCode: 500, Data: [], Message: "Data not found !!"});
-        // }
-
         /* Fetch Paid Amount Details */
         var AmountObj = await PaymentsModel.aggregate([
                                 { "$match": { "StudentID": (parentStudent.StudentID).toString(), "Status" : "Success"}},
@@ -491,6 +434,12 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
         return res.status(500).json({ResponseCode: 500, Data: [], Message: "Data not found !!"});
       }
 
+      let studentClass = await StudentClassModel.findOne({StudentID : ParentRespObj[0].StudentID});
+
+      let SchoolClassesAy = await SchoolClassesModel.findOne({_id : studentClass.SchoolClassID});
+
+      let fees = await FeesModel.findOne({SchoolID: SchoolClassesAy.SchoolID});
+
       /* To Get Payment History */
       var PaymentHistory = await PaymentsModel.aggregate([
                                   { "$lookup": {
@@ -532,7 +481,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
                                       "SchoolName" : { "$arrayElemAt" : ["$schools.Name", 0] },
                                       "AcademicYear" : { "$arrayElemAt" : ["$studentclassesays.AcademicYear", 0] },
                                       "Std" : { "$arrayElemAt" : ["$studentclassesays.Std", 0] },
-                                      "Division" : { "$arrayElemAt" : ["$studentclassesays.Division", 0] },
+                                      "Division" : { "$arrayElemAt" : ["$studentclassesays.Division", 0] }
                                   } },
                                   {
                                     "$sort" : {"PaymentDate" : -1}
@@ -550,10 +499,25 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
         return res.status(500).json({ResponseCode: 500, Data: [], Message: "Data not found !!"});
       }
 
+      /* Fetch Paid Amount Details */
+      var AmountObj = await PaymentsModel.aggregate([
+                            { "$match": { "StudentID": (ParentRespObj[0].StudentID).toString(), "Status" : "Success"}},
+                            {
+                                $group : {
+                                    _id : null,
+                                    total : {
+                                        $sum : "$Amount"
+                                    }
+                                }
+                            }
+                          ]).exec();
+
       /* Response Object */
       let RespObj = {};
           RespObj.ParentID = ParentID;
           RespObj.ParentName = ParentRespObj[0].Name;
+          RespObj.FeeAmount = fees.Amount;
+          RespObj.AmountPaid = (AmountObj.length === 0) ? 0 : AmountObj[0].total;
           RespObj.PaymentData = {
               'StudentID' : (ParentRespObj[0].StudentID).toString(),
               'StudentName' : ParentRespObj[0].StudentName
@@ -608,6 +572,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
   
               if(index != -1){
                 notificationsfinal[index].Notifications.push(obj);
+                notificationsfinal[index].Notifications = (_.sortBy(notificationsfinal[index].Notifications, 'createdAt')).reverse();
               }else{
                 notificationsfinal.push({
                   Month : month,
