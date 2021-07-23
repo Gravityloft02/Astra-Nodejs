@@ -128,6 +128,8 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
 
 
         let parentStudent = await ParentStudentModel.findOne({ParentID : ParentObj._id});
+        console.log('ParentObj._id',ParentObj._id)
+        console.log('parentStudent',parentStudent)
 
         let studentClass = await StudentClassModel.findOne({StudentID : parentStudent.StudentID});
         console.log('studentClass',studentClass)
@@ -136,6 +138,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
         console.log('SchoolClassesAy',SchoolClassesAy)
 
         let fees = await FeesModel.findOne({SchoolID: SchoolClassesAy.SchoolID});
+        console.log('fees',fees)
 
         /* Fetch Paid Amount Details */
         var AmountObj = await PaymentsModel.aggregate([
@@ -404,6 +407,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
       }
 
       let ParentID  = req.body.ParentID;
+      console.log('ParentID',ParentID)
 
       /* To Get Parent & Student Details */
       var ParentRespObj = await ParentsModel.aggregate([
@@ -435,6 +439,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
       if(ParentRespObj.length === 0){
         return res.status(500).json({ResponseCode: 500, Data: [], Message: "Data not found !!"});
       }
+      console.log('ParentRespObj',ParentRespObj)
 
       console.log('ParentRespObj[0].StudentID',ParentRespObj[0].StudentID)
       let studentClass = await StudentClassModel.findOne({StudentID : (ParentRespObj[0].StudentID).toString()});
