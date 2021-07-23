@@ -410,31 +410,6 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
       console.log('ParentID',ParentID)
 
       /* To Get Parent & Student Details */
-      var ParentRespObj = await ParentsModel.aggregate([
-                            { "$lookup": {
-                                "from": "parent-students",
-                                "localField": "ParentID", // Child Colletion Field
-                                "foreignField": "_id", // Parent Colletion Field
-                                "as": "parentstudents"
-                            } },   
-                            { "$lookup": {
-                                "from": "students",
-                                "localField": "students._id",
-                                "foreignField": "parentstudents.StudentID",
-                                "as": "students"
-                            } },
-                            { "$match": { "_id": mongoose.Types.ObjectId(ParentID)}},
-                            { "$project": {
-                                "_id" : 0,
-                                "Name": 1,
-                                "StudentID" : { "$arrayElemAt" : ["$students._id", 0] },
-                                "StudentName" : { "$arrayElemAt" : ["$students.Name", 0] },
-                            } },
-                            {
-                              "$limit" : 1
-                            }
-                         ]).exec();
-
       let ParentRespObj = await ParentsModel.findOne({_id : mongoose.Types.ObjectId(ParentID)});
       console.log('ParentRespObj',ParentRespObj)
 
