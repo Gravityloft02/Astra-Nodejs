@@ -12,6 +12,7 @@ const async = require("async"),
       datetime = require('../../../lib/datetime'),
       { check, matches,validationResult, matchedData } = require('express-validator');
 
+const checkBody = check(['body']);
 const {SchoolsModel} = require("../../models/schoolsModel");
 const {AdminsModel} = require("../../models/adminsModel");
 const {SchoolClassesModel} = require("../../models/schoolClassModel");
@@ -34,11 +35,7 @@ let schoolsController = {validate,add,assign}
                          throw new Error('Invalid state.');
                        }
                        return true
-                    }),
-                    check('ClassID').trim(),
-                    check('AcademicYear').trim(),
-                    check('Std').trim(),
-                    check('Division').trim()
+                    })
                  ]
            }
            break;
@@ -90,20 +87,41 @@ let schoolsController = {validate,add,assign}
          return;
       }
 
+      if(!req.body.ClassAcademics){
+        return res.status(500).json({ResponseCode: 500, Data: [], Message: 'ClassAcademics field is required.'});
+      }
+      let ClassAcademics = req.body.ClassAcademics;
+      for (var i = 0; i < ClassAcademics.length; i++) {
+        if(!ClassAcademics[i].AcademicYear){
+          return res.status(500).json({ResponseCode: 500, Data: [], Message: 'AcademicYear field is required.'});
+        }else if(!ClassAcademics[i].Std){
+          return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Standard field is required.'});
+        }else if(!ClassAcademics[i].Division){
+          return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Division field is required.'});
+        }else if(!ClassAcademics[i].FeeAmount){
+          return res.status(500).json({ResponseCode: 500, Data: [], Message: 'FeeAmount field is required.'});
+        }
+      }
+
       /* Save School */
       let SchoolModelObj = new SchoolsModel({Name:req.body.Name,Address:req.body.Address,State:req.body.State});
       let School = await SchoolModelObj.save();
       if(School._id){
 
-        /* Save School Classes */
-        let SchoolClassesModelObj = new SchoolClassesModel({ClassID:(req.body.ClassID || 7),SchoolID:School._id,AcademicYear:(req.body.AcademicYear || '2021-22'),Std:(req.body.Std || '7'),Division:(req.body.Division || 'A')});
-        let SchoolClass = await SchoolClassesModelObj.save();
+        let SchoolClassIDs = [];
+        for (var i = 0; i < ClassAcademics.length; i++) {
 
-        /* Save Fees */
-        let FeesModelObj = new FeesModel({ClassID:(req.body.ClassID || 7),SchoolID:School._id,Amount:(req.body.Amount || 10000),DueDate:(req.body.DueDate || datetime.addTime(3,'months'))});
-        await FeesModelObj.save();
+          /* Save School Classes */
+          let SchoolClassesModelObj = new SchoolClassesModel({ClassID:ClassAcademics[i].Std,SchoolID:School._id,AcademicYear:ClassAcademics[i].AcademicYear,Std:ClassAcademics[i].Std,Division:ClassAcademics[i].Division});
+          let SchoolClass = await SchoolClassesModelObj.save();
+          SchoolClassIDs.push(SchoolClass._id);
 
-        return res.status(200).json({ResponseCode: 200, Data: {SchoolID:School._id,SchoolClassID:SchoolClass._id}, Message: 'School created successfully.'});
+          /* Save Fees */
+          let FeesModelObj = new FeesModel({ClassID:SchoolClass._id,SchoolID:School._id,Amount:ClassAcademics[i].FeeAmount,DueDate:(req.body.DueDate || datetime.addTime(3,'months'))});
+          await FeesModelObj.save();
+        }
+
+        return res.status(200).json({ResponseCode: 200, Data: {SchoolID:School._id,SchoolClassIDs:SchoolClassIDs}, Message: 'School created successfully.'});
       }else{
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }
