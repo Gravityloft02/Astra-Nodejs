@@ -9,8 +9,8 @@ const mongoose   = require('mongoose'),
       { Schema } = mongoose;
 
 const parentStudentSchema = new Schema({
-    ParentID: { type: String, required: true},
-    StudentID: { type: String, required: true },
+    ParentID: { type: Schema.ObjectId, required: true},
+    StudentID: { type: Schema.ObjectId, required: true },
     ValidTill: { type: String, required: true },
     StudentClass: [{ type: Schema.Types.ObjectId, ref:'StudentClassModel' }],
 });

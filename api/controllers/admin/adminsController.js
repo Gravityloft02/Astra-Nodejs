@@ -7,6 +7,7 @@
 */
 
 const async = require("async"),
+      mongoose = require("mongoose"),
       jwt   = require("jsonwebtoken"),
       constant = require('../../../config/globalConstant'),
       helper = require('../../../lib/helper'),
@@ -25,6 +26,8 @@ const {ParentStudentModel} = require("../../models/parentStudentModel");
 const {ParentsModel} = require("../../models/parentsModel");
 const {NotificationsModel} = require("../../models/notificationsModel");
 const {SchoolsModel} = require("../../models/schoolsModel");
+const {StudentsModel} = require("../../models/studentsModel");
+const {PaymentsModel} = require("../../models/paymentsModel");
 
 /* Require Enviornment File  */
 require('dotenv').config();
@@ -114,8 +117,6 @@ let adminsController = {validate,add,authenticate, sendNotification, getNotifica
           return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
         }
       } catch (err) {
-
-        console.log(err)
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }
   }
@@ -155,46 +156,103 @@ let adminsController = {validate,add,authenticate, sendNotification, getNotifica
         }
 
         /* Get Admin School */
-        var AdminSchoolObj = await SchoolAdminModel.findOne({ AdminID: AdminObj._id}).select({"_id": 0, "SchoolID" : 1}).limit(1).exec();
+        var AdminSchoolObj = await SchoolAdminModel.findOne({ AdminID: mongoose.Types.ObjectId(AdminObj._id)}).select({"_id": 0, "SchoolID" : 1}).limit(1).exec();
         if(!AdminSchoolObj){
           return res.status(500).json({ResponseCode: 500, Data: [], Message: 'There is no school assigned yet !'});
         }
 
         /* Get Admin School Fees */
-        var AdminSchoolFeesArr = await FeesModel.find({ SchoolID: AdminSchoolObj.SchoolID}).select({"ClassID": 1, "Amount" : 1}).exec();
+        var AdminSchoolFeesArr = await FeesModel.find({ SchoolID: mongoose.Types.ObjectId(AdminSchoolObj.SchoolID)}).select({"ClassID": 1, "Amount" : 1, "_id" : 0}).exec();
 
-        /* Get Students */
-        var StudentsArr = await SchoolClassesModel.aggregate([
-                          { "$lookup": {
-                              "from": "student-classes",
-                              "localField": "studentclasses.SchoolClassID",
-                              "foreignField": "_id",
-                              "as": "studentclasses"
-                          } },    
-                          { "$lookup": {
-                              "from": "students",
-                              "localField": "students.StudentID",
-                              "foreignField": "studentclasses.SchoolID",
-                              "as": "students"
-                          } },
-                          { "$lookup": {
-                              "from": "payments",
-                              "localField": "payments.StudentID",
-                              "foreignField": "students._id",
-                              "as": "payments"
-                          } },
+        /* Get School Class & Fees Data */
+        let StudentsArr = [];
+        var SchoolClassFeeData = await SchoolClassesModel.aggregate([
+                                  { "$lookup": {
+                                      "from": "fees",
+                                      "localField": "_id",
+                                      "foreignField": "ClassID",
+                                      "as": "fees"
+                                  } },
+                                  { "$match": { "SchoolID": mongoose.Types.ObjectId(AdminSchoolObj.SchoolID)}},
+                                  { "$project": {
+                                      "_id" : 0,
+                                      "ClassID" : 1,
+                                      "AcademicYear" : 1,
+                                      "Std" : 1,
+                                      "Division" : 1,
+                                      "SchoolClassID" : { "$arrayElemAt" : ["$fees.ClassID", 0] },
+                                      "TotalFeeAmount" : { "$arrayElemAt" : ["$fees.Amount", 0] },
+                                      "DueDate" : { "$arrayElemAt" : ["$fees.DueDate", 0] }
+                                  } }
+                               ]).exec();
+        if(SchoolClassFeeData.length > 0){
+          let SchoolClassIds = [];
+          let SchoolClassFeeObj = {};
+          for (var i = 0; i < SchoolClassFeeData.length; i++) {
+            SchoolClassIds.push(mongoose.Types.ObjectId(SchoolClassFeeData[i].SchoolClassID))
+            SchoolClassFeeObj[SchoolClassFeeData[i].SchoolClassID] = SchoolClassFeeData[i];
+          }
 
-                          { "$match": { "SchoolID": (AdminSchoolObj.SchoolID).toString()}},
-                          { "$project": {
-                              "_id" : 0,
-                              "StudentID" : { "$arrayElemAt" : ["$students._id", 0] },
-                              "StudentName" : { "$arrayElemAt" : ["$students.Name", 0] },
-                              "ClassID" : 1,
-                              "AcademicYear" : 1,
-                              "Std" : 1,
-                              "Division" : 1,
-                          } }
-                       ]).exec();
+          /* Get Students */
+          var StudentsData = await ParentStudentModel.aggregate([
+                                  { "$lookup": {
+                                      "from": "parents",
+                                      "localField": "ParentID",
+                                      "foreignField": "_id",
+                                      "as": "parents"
+                                  } },
+                                  { "$lookup": {
+                                      "from": "students",
+                                      "localField": "StudentID",
+                                      "foreignField": "_id",
+                                      "as": "students"
+                                  } },
+                                  { "$lookup": {
+                                      "from": "student-classes",
+                                      "localField": "StudentID",
+                                      "foreignField": "StudentID",
+                                      "as": "studentclasses"
+                                  } },
+                                  { "$match": { "studentclasses.SchoolClassID": {"$in" : SchoolClassIds}}},
+                                  { "$project": {
+                                      "_id" : 0,
+                                      "StudentID" : 1,
+                                      "SchoolClassID" : { "$arrayElemAt" : ["$studentclasses.SchoolClassID", 0] },
+                                      "StudentName" : { "$arrayElemAt" : ["$students.Name", 0] },
+                                      "ParentName" : { "$arrayElemAt" : ["$parents.Name", 0] }
+                                  } }
+                               ]).exec();
+          if(StudentsData.length > 0){
+            for (var i = 0; i < StudentsData.length; i++) {
+              let SchoolClassFee = SchoolClassFeeObj[StudentsData[i].SchoolClassID];
+              StudentsArr[i] = {
+                "StudentID" : (StudentsData[i].StudentID).toString(),
+                "StudentName" : StudentsData[i].StudentName,
+                "ParentName" : StudentsData[i].ParentName,
+                "ClassID" : SchoolClassFee.ClassID,
+                "AcademicYear" : SchoolClassFee.AcademicYear,
+                "Std" : SchoolClassFee.Std,
+                "Division" : SchoolClassFee.Division,
+                "TotalFeeAmount" : SchoolClassFee.TotalFeeAmount,
+                "DueDate" : SchoolClassFee.DueDate
+              }
+
+              /* Get Total Paid fee */
+              var AmountObj = await PaymentsModel.aggregate([
+                                { "$match": { "StudentID": StudentsData[i].StudentID, "Status" : "Success"}},
+                                {
+                                    $group : {
+                                        _id : null,
+                                        total : {
+                                            $sum : "$Amount"
+                                        }
+                                    }
+                                }
+                              ]).exec();
+              StudentsArr[i].TotalPaidFee = (AmountObj.length === 0) ? 0 : AmountObj[0].total;
+            }
+          }
+        }
 
         /* Generate Token */
         let RespObj = {};
@@ -204,6 +262,7 @@ let adminsController = {validate,add,authenticate, sendNotification, getNotifica
             RespObj.Students = StudentsArr;
         return res.status(200).json({ResponseCode: 200, Data: RespObj, Message: 'success'});
       } catch (err) {
+        console.log('err',err)
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }
   }

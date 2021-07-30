@@ -7,6 +7,7 @@
 */
 
 const async = require("async"),
+      mongoose = require("mongoose"),
       constant = require('../../../config/globalConstant'),
       states = require('../../../data/states.json'),
       datetime = require('../../../lib/datetime'),
@@ -144,19 +145,19 @@ let schoolsController = {validate,add,assign}
       }
 
       /* To check If Admin is already assigned */
-      var IsAdminAssigned = await SchoolAdminModel.findOne({ AdminID: req.body.AdminID}).select({"_id": 1}).limit(1).exec();
+      var IsAdminAssigned = await SchoolAdminModel.findOne({ AdminID: mongoose.Types.ObjectId(req.body.AdminID)}).select({"_id": 1}).limit(1).exec();
       if(IsAdminAssigned){
         return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Admin already assigned.'});
       }
 
       /* To check If School is already assigned */
-      var IsSchoolAssigned = await SchoolAdminModel.findOne({ SchoolID: req.body.SchoolID}).select({"_id": 1}).limit(1).exec();
+      var IsSchoolAssigned = await SchoolAdminModel.findOne({ SchoolID: mongoose.Types.ObjectId(req.body.SchoolID)}).select({"_id": 1}).limit(1).exec();
       if(IsSchoolAssigned){
         return res.status(500).json({ResponseCode: 500, Data: [], Message: 'School already assigned.'});
       }
 
       /* Assign Admin & School */
-      let SchoolAdminModelObj = new SchoolAdminModel({AdminID:req.body.AdminID,SchoolID:req.body.SchoolID,ValidTill:(req.body.ValidTill || datetime.addTime(1,'years'))});
+      let SchoolAdminModelObj = new SchoolAdminModel({AdminID:mongoose.Types.ObjectId(req.body.AdminID),SchoolID:mongoose.Types.ObjectId(req.body.SchoolID),ValidTill:(req.body.ValidTill || datetime.addTime(1,'years'))});
       SchoolAdminModelObj.save()
       .then((school) => {
         if(school._id){

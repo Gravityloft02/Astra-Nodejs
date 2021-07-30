@@ -14,9 +14,9 @@ const paymentsSchema = new Schema({
     RazorPayOrderID: { type: String, required: false},
     RazorPayJsonResponse: { type: Object, required: false},
     TransferPaymentRazorPayRouteJsonResponse: { type: Object, required: false},
-    FeeID: { type: String, required: true },	
-    ParentID: { type: String, required: true },
-    StudentID: { type: String, required: true },
+    FeeID: { type: Schema.ObjectId, required: true },	
+    ParentID: { type: Schema.ObjectId, required: true },
+    StudentID: { type: Schema.ObjectId, required: true },
     Amount: { type: Number, required: true},
     Status: { type: String, enum : ['Failed', 'Pending', 'Success'] },
 });

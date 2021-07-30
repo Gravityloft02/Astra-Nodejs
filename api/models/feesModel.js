@@ -9,8 +9,8 @@ const mongoose   = require('mongoose'),
       { Schema } = mongoose;
 
 const feesSchema = new Schema({
-    SchoolID: { type: String, required: true},
-    ClassID: { type: String, required: true},
+    SchoolID: { type: Schema.ObjectId, required: true},
+    ClassID: { type: Schema.ObjectId, required: true},
     Amount: { type: Number, required: true},
     DueDate: { type: String, required: true },
 });

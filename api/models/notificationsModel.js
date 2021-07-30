@@ -9,12 +9,12 @@ const mongoose   = require('mongoose'),
       { Schema } = mongoose;
 
 const notificationsSchema = new Schema({
-    AdminID: { type: String, required: true },
+    AdminID: { type: Schema.ObjectId, required: true },
     TargetClassID: [{ type: String, required: true }],
-    SchoolID: { type: String, required: true },
+    SchoolID: { type: Schema.ObjectId, required: true },
     NotificationSubject : {type : String, required: true},
     NotificationContent : {type : String, required: true},
-    StudentID : [{type : String, required: true, ref : "Students"}]
+    StudentID : [{type : Schema.ObjectId, required: true, ref : "Students"}]
 });
 
 notificationsSchema.set('timestamps', true);

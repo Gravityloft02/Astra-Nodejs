@@ -10,7 +10,7 @@ const mongoose   = require('mongoose'),
 
 const schoolClassesSchema = new Schema({
     ClassID: { type: Number, required: true},
-    SchoolID: { type: String, required: true },
+    SchoolID: { type: Schema.ObjectId, required: true },
     AcademicYear: { type: String, required: true},
     Std: { type: String, required: true },
     Division: { type: String, required: true },
