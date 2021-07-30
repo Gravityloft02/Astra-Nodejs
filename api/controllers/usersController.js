@@ -6,7 +6,8 @@
  * Developed By  : Gravityloft
 */
 
-const async = require("async"),
+const async = require("async"),   
+      mongoose = require("mongoose"),
       constant = require('../../config/globalConstant'),
       helper = require('../../lib/helper'),
       { check, matches,validationResult, matchedData } = require('express-validator');
@@ -51,7 +52,7 @@ let usersController = {validate,change_password}
 
       /* To Verify Old Password */
       try {
-        var UserObj = await UsersModel.findOne({ _id: req.body.UserID}).select({"_id": 0, "Password" : 1}).limit(1).exec();
+        var UserObj = await UsersModel.findOne({ _id: mongoose.Types.ObjectId(req.body.UserID)}).select({"_id": 0, "Password" : 1}).limit(1).exec();
 
         /* Validate Passowrd */
         if(!helper.compareHashStr(req.body.OldPassword,UserObj.Password)){
@@ -60,7 +61,7 @@ let usersController = {validate,change_password}
 
         /* To Update User New Password */
         let HashPassword = await helper.generateHashStr(req.body.NewPassword)
-        let UserUpdate = await UsersModel.updateOne({ _id: req.body.UserID},{Password:HashPassword},{upsert:false, rawResult:true});
+        let UserUpdate = await UsersModel.updateOne({ _id: mongoose.Types.ObjectId(req.body.UserID)},{Password:HashPassword},{upsert:false, rawResult:true});
         if(UserUpdate.ok){
           return res.status(200).json({ResponseCode: 200, Data: [], Message: 'Password changed successfully.'});
         }else{

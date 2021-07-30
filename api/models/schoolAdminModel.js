@@ -9,8 +9,8 @@ const mongoose   = require('mongoose'),
       { Schema } = mongoose;
 
 const schoolAdminSchema = new Schema({
-    SchoolID: { type: String, required: true},
-    AdminID: { type: String, required: true },
+    SchoolID: { type: Schema.ObjectId, required: true},
+    AdminID: { type: Schema.ObjectId, required: true },
     ValidTill: { type: String, required: true },
 });
 

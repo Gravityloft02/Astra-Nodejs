@@ -7,6 +7,7 @@
 */
 
 const async = require("async"),
+      mongoose = require("mongoose"),
       constant = require('../../../config/globalConstant'),
       datetime = require('../../../lib/datetime'),
       { check, matches,validationResult, matchedData } = require('express-validator');
@@ -15,6 +16,7 @@ const {StudentsModel} = require("../../models/studentsModel");
 const {StudentClassModel} = require("../../models/studentClassModel");
 const {ParentsModel} = require("../../models/parentsModel");
 const {ParentStudentModel} = require("../../models/parentStudentModel");
+const {SchoolClassesModel} = require("../../models/schoolClassModel");
 
 let studentsController = {validate,add,assign}
 
@@ -35,7 +37,7 @@ let studentsController = {validate,add,assign}
            case 'assign': {
               return [ 
                     check('ParentID').notEmpty().withMessage('Parent ID field is required').trim().custom(val => {   
-                      return ParentsModel.findOne({ _id: val}).select({"_id": 1}).exec().then(parent => {
+                      return ParentsModel.findOne({ _id: mongoose.Types.ObjectId(val)}).select({"_id": 1}).exec().then(parent => {
                         if (!parent) {
                           return Promise.reject('Invalid Parent ID.');
                         }
@@ -43,7 +45,7 @@ let studentsController = {validate,add,assign}
                       });
                     }),
                     check('StudentID').notEmpty().withMessage('Student ID field is required').trim().custom(val => {   
-                      return StudentsModel.findOne({ _id: val}).select({"_id": 1}).exec().then(student => {
+                      return StudentsModel.findOne({ _id: mongoose.Types.ObjectId(val)}).select({"_id": 1}).exec().then(student => {
                         if (!student) {
                           return Promise.reject('Invalid Student ID.');
                         }
@@ -84,11 +86,17 @@ let studentsController = {validate,add,assign}
       try {
         var IsName = await StudentsModel.findOne({ Name: req.body.Name}).select({ "Name": 1, "_id": 0}).limit(1).exec();
         if(IsName){
-          return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Student name number already exists !'});
+          return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Student name already exists !'});
         }
       } catch (err) {
         console.log('err',err)
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
+      }
+
+      /* To check If School Class Id Is Valid */
+      var IsSchoolClass = await SchoolClassesModel.findOne({ _id: mongoose.Types.ObjectId(req.body.SchoolClassID)}).select({"_id": 1}).limit(1).exec();
+      if(!IsSchoolClass){
+        return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Invalid School ClassID.'});
       }
 
       let StudentModelObj = new StudentsModel({Name:req.body.Name,Address:req.body.Address,DOB:req.body.DOB});
@@ -97,7 +105,7 @@ let studentsController = {validate,add,assign}
         if(student._id){
 
           /* Save Student Class */
-          let StudentClassModelObj = new StudentClassModel({SchoolClassID:req.body.SchoolClassID,StudentID:student._id});
+          let StudentClassModelObj = new StudentClassModel({SchoolClassID:mongoose.Types.ObjectId(req.body.SchoolClassID),StudentID:student._id});
           StudentClassModelObj.save();
 
           return res.status(200).json({ResponseCode: 200, Data: {StudentID:student._id}, Message: 'Student created successfully.'});
@@ -128,19 +136,19 @@ let studentsController = {validate,add,assign}
       }
 
       /* To check If Parent is already assigned */
-      var IsParentAssigned = await ParentStudentModel.findOne({ ParentID: req.body.ParentID}).select({"_id": 1}).limit(1).exec();
+      var IsParentAssigned = await ParentStudentModel.findOne({ ParentID: mongoose.Types.ObjectId(req.body.ParentID)}).select({"_id": 1}).limit(1).exec();
       if(IsParentAssigned){
         return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Parent already assigned.'});
       }
 
       /* To check If Student is already assigned */
-      var IsStudentAssigned = await ParentStudentModel.findOne({ StudentID: req.body.StudentID}).select({"_id": 1}).limit(1).exec();
+      var IsStudentAssigned = await ParentStudentModel.findOne({ StudentID: mongoose.Types.ObjectId(req.body.StudentID)}).select({"_id": 1}).limit(1).exec();
       if(IsStudentAssigned){
         return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Student already assigned.'});
       }
 
       /* Assign Parent & Student */
-      let StudentParentModelObj = new ParentStudentModel({ParentID:req.body.ParentID,StudentID:req.body.StudentID,ValidTill:(req.body.ValidTill || datetime.addTime(1,'years'))});
+      let StudentParentModelObj = new ParentStudentModel({ParentID:mongoose.Types.ObjectId(req.body.ParentID),StudentID:mongoose.Types.ObjectId(req.body.StudentID),ValidTill:(req.body.ValidTill || datetime.addTime(1,'years'))});
       StudentParentModelObj.save()
       .then((student) => {
         if(student._id){

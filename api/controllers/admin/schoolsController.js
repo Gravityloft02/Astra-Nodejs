@@ -7,11 +7,13 @@
 */
 
 const async = require("async"),
+      mongoose = require("mongoose"),
       constant = require('../../../config/globalConstant'),
       states = require('../../../data/states.json'),
       datetime = require('../../../lib/datetime'),
       { check, matches,validationResult, matchedData } = require('express-validator');
 
+const checkBody = check(['body']);
 const {SchoolsModel} = require("../../models/schoolsModel");
 const {AdminsModel} = require("../../models/adminsModel");
 const {SchoolClassesModel} = require("../../models/schoolClassModel");
@@ -34,18 +36,14 @@ let schoolsController = {validate,add,assign}
                          throw new Error('Invalid state.');
                        }
                        return true
-                    }),
-                    check('ClassID').trim(),
-                    check('AcademicYear').trim(),
-                    check('Std').trim(),
-                    check('Division').trim()
+                    })
                  ]
            }
            break;
            case 'assign': {
               return [ 
                     check('AdminID').notEmpty().withMessage('Admin ID field is required').trim().custom(val => {   
-                      return AdminsModel.findOne({ _id: val}).select({"_id": 1}).exec().then(admin => {
+                      return AdminsModel.findOne({ _id: mongoose.Types.ObjectId(val)}).select({"_id": 1}).exec().then(admin => {
                         if (!admin) {
                           return Promise.reject('Invalid Admin ID.');
                         }
@@ -53,7 +51,7 @@ let schoolsController = {validate,add,assign}
                       });
                     }),
                     check('SchoolID').notEmpty().withMessage('School ID field is required').trim().custom(val => {   
-                      return SchoolsModel.findOne({ _id: val}).select({"_id": 1}).exec().then(school => {
+                      return SchoolsModel.findOne({ _id: mongoose.Types.ObjectId(val)}).select({"_id": 1}).exec().then(school => {
                         if (!school) {
                           return Promise.reject('Invalid School ID.');
                         }
@@ -90,20 +88,41 @@ let schoolsController = {validate,add,assign}
          return;
       }
 
+      if(!req.body.ClassAcademics){
+        return res.status(500).json({ResponseCode: 500, Data: [], Message: 'ClassAcademics field is required.'});
+      }
+      let ClassAcademics = req.body.ClassAcademics;
+      for (var i = 0; i < ClassAcademics.length; i++) {
+        if(!ClassAcademics[i].AcademicYear){
+          return res.status(500).json({ResponseCode: 500, Data: [], Message: 'AcademicYear field is required.'});
+        }else if(!ClassAcademics[i].Std){
+          return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Standard field is required.'});
+        }else if(!ClassAcademics[i].Division){
+          return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Division field is required.'});
+        }else if(!ClassAcademics[i].FeeAmount){
+          return res.status(500).json({ResponseCode: 500, Data: [], Message: 'FeeAmount field is required.'});
+        }
+      }
+
       /* Save School */
       let SchoolModelObj = new SchoolsModel({Name:req.body.Name,Address:req.body.Address,State:req.body.State});
       let School = await SchoolModelObj.save();
       if(School._id){
 
-        /* Save School Classes */
-        let SchoolClassesModelObj = new SchoolClassesModel({ClassID:(req.body.ClassID || 7),SchoolID:School._id,AcademicYear:(req.body.AcademicYear || '2021-22'),Std:(req.body.Std || '7'),Division:(req.body.Division || 'A')});
-        let SchoolClass = await SchoolClassesModelObj.save();
+        let SchoolClassIDs = [];
+        for (var i = 0; i < ClassAcademics.length; i++) {
 
-        /* Save Fees */
-        let FeesModelObj = new FeesModel({ClassID:(req.body.ClassID || 7),SchoolID:School._id,Amount:(req.body.Amount || 10000),DueDate:(req.body.DueDate || datetime.addTime(3,'months'))});
-        await FeesModelObj.save();
+          /* Save School Classes */
+          let SchoolClassesModelObj = new SchoolClassesModel({ClassID:ClassAcademics[i].Std,SchoolID:School._id,AcademicYear:ClassAcademics[i].AcademicYear,Std:ClassAcademics[i].Std,Division:ClassAcademics[i].Division});
+          let SchoolClass = await SchoolClassesModelObj.save();
+          SchoolClassIDs.push(SchoolClass._id);
 
-        return res.status(200).json({ResponseCode: 200, Data: {SchoolID:School._id,SchoolClassID:SchoolClass._id}, Message: 'School created successfully.'});
+          /* Save Fees */
+          let FeesModelObj = new FeesModel({ClassID:SchoolClass._id,SchoolID:School._id,Amount:ClassAcademics[i].FeeAmount,DueDate:(req.body.DueDate || datetime.addTime(3,'months'))});
+          await FeesModelObj.save();
+        }
+
+        return res.status(200).json({ResponseCode: 200, Data: {SchoolID:School._id,SchoolClassIDs:SchoolClassIDs}, Message: 'School created successfully.'});
       }else{
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }
@@ -126,19 +145,19 @@ let schoolsController = {validate,add,assign}
       }
 
       /* To check If Admin is already assigned */
-      var IsAdminAssigned = await SchoolAdminModel.findOne({ AdminID: req.body.AdminID}).select({"_id": 1}).limit(1).exec();
+      var IsAdminAssigned = await SchoolAdminModel.findOne({ AdminID: mongoose.Types.ObjectId(req.body.AdminID)}).select({"_id": 1}).limit(1).exec();
       if(IsAdminAssigned){
         return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Admin already assigned.'});
       }
 
       /* To check If School is already assigned */
-      var IsSchoolAssigned = await SchoolAdminModel.findOne({ SchoolID: req.body.SchoolID}).select({"_id": 1}).limit(1).exec();
+      var IsSchoolAssigned = await SchoolAdminModel.findOne({ SchoolID: mongoose.Types.ObjectId(req.body.SchoolID)}).select({"_id": 1}).limit(1).exec();
       if(IsSchoolAssigned){
         return res.status(500).json({ResponseCode: 500, Data: [], Message: 'School already assigned.'});
       }
 
       /* Assign Admin & School */
-      let SchoolAdminModelObj = new SchoolAdminModel({AdminID:req.body.AdminID,SchoolID:req.body.SchoolID,ValidTill:(req.body.ValidTill || datetime.addTime(1,'years'))});
+      let SchoolAdminModelObj = new SchoolAdminModel({AdminID:mongoose.Types.ObjectId(req.body.AdminID),SchoolID:mongoose.Types.ObjectId(req.body.SchoolID),ValidTill:(req.body.ValidTill || datetime.addTime(1,'years'))});
       SchoolAdminModelObj.save()
       .then((school) => {
         if(school._id){

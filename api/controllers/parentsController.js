@@ -25,6 +25,7 @@ const {StudentClassModel} = require("../models/studentClassModel");
 const {NotificationsModel} = require("../models/notificationsModel");
 const {SchoolClassesModel} = require("../models/schoolClassModel");
 const {FeesModel} = require("../models/feesModel");
+const {AdminsModel} = require("../models/adminsModel");
 
 /* Require Enviornment File  */
 require('dotenv').config();
@@ -118,31 +119,22 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
 
         /* Check Entry In Parents */
         var ParentObj = await ParentsModel.findOne({ Phone: req.body.Phone}).select({"_id": 1, "Name" : 1}).limit(1).exec();
-        
         if(!ParentObj){
           return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Phone number not exists !'});
         }
 
         /* To Update Device Details (Background Process) */
-        await ParentsModel.updateOne({ _id: ParentObj._id},{ DeviceType: req.body.DeviceType, DeviceKey: req.body.DeviceKey},{upsert:false, rawResult:true});
+        await ParentsModel.updateOne({ _id: mongoose.Types.ObjectId(ParentObj._id)},{ DeviceType: req.body.DeviceType, DeviceKey: req.body.DeviceKey},{upsert:false, rawResult:true});
 
+        let parentStudent = await ParentStudentModel.findOne({ParentID : mongoose.Types.ObjectId(ParentObj._id)});
 
-        let parentStudent = await ParentStudentModel.findOne({ParentID : ParentObj._id});
-        console.log('ParentObj._id',ParentObj._id)
-        console.log('parentStudent',parentStudent)
+        let studentClass = await StudentClassModel.findOne({StudentID : mongoose.Types.ObjectId(parentStudent.StudentID)});
 
-        let studentClass = await StudentClassModel.findOne({StudentID : parentStudent.StudentID});
-        console.log('studentClass',studentClass)
-
-        let SchoolClassesAy = await SchoolClassesModel.findOne({_id : studentClass.SchoolClassID});
-        console.log('SchoolClassesAy',SchoolClassesAy)
-
-        let fees = await FeesModel.findOne({SchoolID: SchoolClassesAy.SchoolID});
-        console.log('fees',fees)
+        let fees = await FeesModel.findOne({ClassID: mongoose.Types.ObjectId(studentClass.SchoolClassID)});
 
         /* Fetch Paid Amount Details */
         var AmountObj = await PaymentsModel.aggregate([
-                                { "$match": { "StudentID": (parentStudent.StudentID).toString(), "Status" : "Success"}},
+                                { "$match": { "StudentID": mongoose.Types.ObjectId(parentStudent.StudentID), "Status" : "Success"}},
                                 {
                                     $group : {
                                         _id : null,
@@ -157,7 +149,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
         let RespObj = {};
             RespObj.Token = jwt.sign({UserID:UserObj._id, ParentID:ParentObj._id, UserType : 'Parent'}, process.env.TOKEN_SECRET, { expiresIn: '36000s' }); // 600 minutes
             RespObj.StudentID = parentStudent.StudentID;
-            RespObj.SchoolID = SchoolClassesAy.SchoolID;
+            RespObj.SchoolID = fees.SchoolID;
             RespObj.FeeAmount = fees.Amount;
             RespObj.DueDate = fees.DueDate;
             RespObj.ParentName = ParentObj.Name;
@@ -188,7 +180,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
 
       /* To Update Device Details */
       try {
-        var ParentObj = await ParentsModel.findOneAndUpdate({ _id: req.body.ParentID},{ DeviceType: req.body.DeviceType, DeviceKey: req.body.DeviceKey},{upsert:false, rawResult:true});
+        var ParentObj = await ParentsModel.findOneAndUpdate({ _id: mongoose.Types.ObjectId(req.body.ParentID)},{ DeviceType: req.body.DeviceType, DeviceKey: req.body.DeviceKey},{upsert:false, rawResult:true});
         return res.status(200).json({ResponseCode: 200, Data: [], Message: 'success'});
       } catch (err) {
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
@@ -212,43 +204,25 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
       }
 
       /* To Get Student Fees Details */
-      var StudentFeeObj = await StudentClassModel.aggregate([
-                                    { "$lookup": {
-                                        "from": "school-class-ays",
-                                        "localField": "_id",
-                                        "foreignField": "SchoolClassID",
-                                        "as": "studentclassesays"
-                                    } }, 
-                                    { "$lookup": {
-                                        "from": "fees",
-                                        "localField": "fees.SchoolID",
-                                        "foreignField": "studentclassesays.SchoolID",
-                                        "as": "fees"
-                                    } },
-                                    { "$lookup": {
-                                        "from": "school-admins",
-                                        "localField": "schooladmins.SchoolID",
-                                        "foreignField": "studentclassesays.SchoolID",
-                                        "as": "schooladmins"
-                                    } },
-                                    { "$lookup": {
-                                        "from": "admins",
-                                        "localField": "admins._id",
-                                        "foreignField": "schooladmins.AdminID",
-                                        "as": "admins"
-                                    } },
-                                     // { "$match": { "StudentID": (req.body.StudentID).toString(), "fees.ClassID" : 7} },
-                                    { "$match": { "StudentID": (req.body.StudentID).toString()} },
-                                    { "$project": {
+      var StudentClassObj = await StudentClassModel.findOne({ StudentID: mongoose.Types.ObjectId(req.body.StudentID)}).select({"_id": 0, "SchoolClassID" : 1}).exec();
+
+      /* To Get Fees */
+      var FeeObj = await FeesModel.findOne({ ClassID: mongoose.Types.ObjectId(StudentClassObj.SchoolClassID)}).select({"SchoolID": 1}).exec();
+
+      /* To Get Admin Details */
+      var AdminObj = await AdminsModel.aggregate([
+                                  { "$lookup": {
+                                      "from": "school-admins",
+                                      "localField": "_id",
+                                      "foreignField": "AdminID",
+                                      "as": "schooladmins"
+                                  } },
+                                  { "$match": { "schooladmins.SchoolID": mongoose.Types.ObjectId(FeeObj.SchoolID)}},
+                                  { "$project": {
                                       "_id" : 0,
-                                      "Amount" : { "$arrayElemAt" : ["$fees.Amount", 0] },
-                                      "FeeID" : { "$arrayElemAt" : ["$fees._id", 0] },
-                                      "RazorPayRouteAccountID" : { "$arrayElemAt" : ["$admins.RazorPayRouteAccountID", 0] }
-                                    } },
-                                    {
-                                      "$limit" : 1
-                                    }
-                                ]).exec();
+                                      "RazorPayRouteAccountID" : 1
+                                  } }
+                               ]).exec();
 
       /* Create Order On Razorpay */
       var config = {
@@ -270,8 +244,8 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
           PaymentData.ParentID  = req.body.ParentID;
           PaymentData.Amount    = req.body.Amount;
           PaymentData.Status    = "Pending";
-          PaymentData.FeeID = StudentFeeObj[0].FeeID;
-          PaymentData.PaidToAccountID = StudentFeeObj[0].RazorPayRouteAccountID;
+          PaymentData.FeeID = FeeObj._id;
+          PaymentData.PaidToAccountID = AdminObj[0].RazorPayRouteAccountID;
           PaymentData.RazorPayOrderID = RazorPayOrderObj.data.id;
       let PaymentsModelObj = new PaymentsModel(PaymentData);
       let Payment = await PaymentsModelObj.save();
@@ -299,14 +273,14 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
       }
 
       /* Check Payment Status */
-      var PaymentObj = await PaymentsModel.findOne({ _id: req.body.PaymentID}).select({"_id": 1, "Status" : 1, "TransactionID" : 1, "Amount" : 1, "StudentID" : 1, "PaidToAccountID" : 1, "RazorPayOrderID" : 1}).limit(1).exec();
+      var PaymentObj = await PaymentsModel.findOne({ _id: mongoose.Types.ObjectId(req.body.PaymentID)}).select({"_id": 1, "Status" : 1, "TransactionID" : 1, "Amount" : 1, "StudentID" : 1, "PaidToAccountID" : 1, "RazorPayOrderID" : 1}).limit(1).exec();
       if(!PaymentObj){
         return res.status(500).json({ResponseCode: 500, Data: [], Message: 'Invalid Payment ID !'});
       }
 
       /* Fetch Paid Amount Details */
       var AmountObj = await PaymentsModel.aggregate([
-                        { "$match": { "StudentID": (PaymentObj.StudentID).toString(), "Status" : "Success"}},
+                        { "$match": { "StudentID": mongoose.Types.ObjectId(PaymentObj.StudentID), "Status" : "Success"}},
                         {
                             $group : {
                                 _id : null,
@@ -382,7 +356,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
       }
 
       try {
-        var ParentObj = await PaymentsModel.findOneAndUpdate({ _id: req.body.PaymentID}, UpdatePayemntObj,{upsert:false, rawResult:true});
+        var ParentObj = await PaymentsModel.findOneAndUpdate({ _id: mongoose.Types.ObjectId(req.body.PaymentID)}, UpdatePayemntObj,{upsert:false, rawResult:true});
         return res.status(200).json({ResponseCode: 200, Data: {PayemntStatus:PayemntStatus,TransactionID:UpdatePayemntObj.TransactionID, AmountPaid : AmountPaidRP, TotalFeePaid : AmountPaid}, Message: 'success'});
       } catch (err) {
         console.log('err',err)
@@ -407,25 +381,17 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
       }
 
       let ParentID  = req.body.ParentID;
-      console.log('ParentID',ParentID)
 
       /* To Get Parent & Student Details */
       let ParentRespObj = await ParentsModel.findOne({_id : mongoose.Types.ObjectId(ParentID)});
-      console.log('ParentRespObj',ParentRespObj)
 
-      let ParentStudentRespObj = await ParentStudentModel.findOne({ParentID : ParentRespObj._id});
-      console.log('ParentStudentRespObj',ParentStudentRespObj)
+      let ParentStudentRespObj = await ParentStudentModel.findOne({ParentID : mongoose.Types.ObjectId(ParentRespObj._id)});
 
       let StudentRespObj = await StudentsModel.findOne({_id : mongoose.Types.ObjectId(ParentStudentRespObj.StudentID)});
-      console.log('StudentRespObj',StudentRespObj)
 
-      let studentClass = await StudentClassModel.findOne({StudentID : ParentStudentRespObj.StudentID});
-      console.log('studentClass',studentClass)
+      let studentClass = await StudentClassModel.findOne({StudentID : mongoose.Types.ObjectId(ParentStudentRespObj.StudentID)});
 
-      let SchoolClassesAy = await SchoolClassesModel.findOne({_id : mongoose.Types.ObjectId(studentClass.SchoolClassID)});
-      console.log('SchoolClassesAy',SchoolClassesAy)
-
-      let fees = await FeesModel.findOne({SchoolID: SchoolClassesAy.SchoolID});
+      let fees = await FeesModel.findOne({ClassID: mongoose.Types.ObjectId(studentClass.SchoolClassID)});
 
       /* To Get Payment History */
       var PaymentHistory = await PaymentsModel.aggregate([
@@ -453,7 +419,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
                                       "foreignField": "FeeID",
                                       "as": "fees"
                                   } },  
-                                  { "$match": { "ParentID": (ParentID).toString(), "Status" : {"$in" : ["Failed","Success"]} } },
+                                  { "$match": { "ParentID": mongoose.Types.ObjectId(ParentID), "Status" : {"$in" : ["Failed","Success"]} } },
                                   { "$project": {
                                       "PaymentID" : "$_id",
                                       "Amount" : "$Amount",
@@ -488,7 +454,7 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
 
       /* Fetch Paid Amount Details */
       var AmountObj = await PaymentsModel.aggregate([
-                            { "$match": { "StudentID": (ParentStudentRespObj.StudentID).toString(), "Status" : "Success"}},
+                            { "$match": { "StudentID": mongoose.Types.ObjectId(ParentStudentRespObj.StudentID), "Status" : "Success"}},
                             {
                                 $group : {
                                     _id : null,
@@ -530,10 +496,10 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
   }
 
   try{
-    let ParentDetails = await ParentsModel.findOne({_id : req.body.ParentID});
+    let ParentDetails = await ParentsModel.findOne({_id : mongoose.Types.ObjectId(req.body.ParentID)});
 
     if(ParentDetails){
-      let ParentsStudents = await ParentStudentModel.find({ParentID : ParentDetails._id});
+      let ParentsStudents = await ParentStudentModel.find({ParentID : mongoose.Types.ObjectId(ParentDetails._id)});
 
       let student_ids = _.pluck(ParentsStudents, "StudentID");
       let notifications = await NotificationsModel.find({StudentID : {$in : student_ids}}).select({NotificationSubject : 1, NotificationContent : 1, createdAt : 1, StudentID: 1}).sort({"createdAt": -1}).limit(200);
