@@ -37,7 +37,7 @@ let studentsController = {validate,add,assign}
            case 'assign': {
               return [ 
                     check('ParentID').notEmpty().withMessage('Parent ID field is required').trim().custom(val => {   
-                      return ParentsModel.findOne({ _id: val}).select({"_id": 1}).exec().then(parent => {
+                      return ParentsModel.findOne({ _id: mongoose.Types.ObjectId(val)}).select({"_id": 1}).exec().then(parent => {
                         if (!parent) {
                           return Promise.reject('Invalid Parent ID.');
                         }
@@ -45,7 +45,7 @@ let studentsController = {validate,add,assign}
                       });
                     }),
                     check('StudentID').notEmpty().withMessage('Student ID field is required').trim().custom(val => {   
-                      return StudentsModel.findOne({ _id: val}).select({"_id": 1}).exec().then(student => {
+                      return StudentsModel.findOne({ _id: mongoose.Types.ObjectId(val)}).select({"_id": 1}).exec().then(student => {
                         if (!student) {
                           return Promise.reject('Invalid Student ID.');
                         }

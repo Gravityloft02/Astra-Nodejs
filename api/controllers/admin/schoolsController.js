@@ -43,7 +43,7 @@ let schoolsController = {validate,add,assign}
            case 'assign': {
               return [ 
                     check('AdminID').notEmpty().withMessage('Admin ID field is required').trim().custom(val => {   
-                      return AdminsModel.findOne({ _id: val}).select({"_id": 1}).exec().then(admin => {
+                      return AdminsModel.findOne({ _id: mongoose.Types.ObjectId(val)}).select({"_id": 1}).exec().then(admin => {
                         if (!admin) {
                           return Promise.reject('Invalid Admin ID.');
                         }
@@ -51,7 +51,7 @@ let schoolsController = {validate,add,assign}
                       });
                     }),
                     check('SchoolID').notEmpty().withMessage('School ID field is required').trim().custom(val => {   
-                      return SchoolsModel.findOne({ _id: val}).select({"_id": 1}).exec().then(school => {
+                      return SchoolsModel.findOne({ _id: mongoose.Types.ObjectId(val)}).select({"_id": 1}).exec().then(school => {
                         if (!school) {
                           return Promise.reject('Invalid School ID.');
                         }

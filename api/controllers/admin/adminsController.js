@@ -239,7 +239,7 @@ let adminsController = {validate,add,authenticate, sendNotification, getNotifica
 
               /* Get Total Paid fee */
               var AmountObj = await PaymentsModel.aggregate([
-                                { "$match": { "StudentID": StudentsData[i].StudentID, "Status" : "Success"}},
+                                { "$match": { "StudentID": mongoose.Types.ObjectId(StudentsData[i].StudentID), "Status" : "Success"}},
                                 {
                                     $group : {
                                         _id : null,
@@ -301,22 +301,18 @@ let adminsController = {validate,add,authenticate, sendNotification, getNotifica
           return res.status(400).json({ResponseCode: 400, Data: [], Message: "School ID is required"});
         }
 
-        // let ClassDetails = await SchoolClassesModel.findOne({_id : req.body.TargetClassID});
-        let ClassDetails = await SchoolClassesModel.find({ClassID : {$in : req.body.TargetClassID}, SchoolID : req.body.SchoolID});
+        let ClassDetails = await SchoolClassesModel.find({ClassID : {$in : req.body.TargetClassID}, SchoolID : mongoose.Types.ObjectId(req.body.SchoolID)});
         
         if(ClassDetails && ClassDetails.length <= 0){
           return res.status(404).json({ResponseCode: 404, Data: [], Message: "Student not found for this classes"});
         }
 
-        let ClassIDs = _.pluck(ClassDetails, '_id');
-
+        let ClassIDs = _.pluck(ClassDetails, '_id')
         let StudentClass = await StudentClassModel.find({SchoolClassID : {$in : ClassIDs}});
 
         if(StudentClass && StudentClass.length <= 0){
           return res.status(404).json({ResponseCode: 404, Data: [], Message: "Student not found for this classes"});
         }
-
-        // let SchoolDetails = await SchoolsModel.findOne({_id : ClassDetails.SchoolID});
 
         let student_ids = _.pluck(StudentClass, "StudentID");
 
@@ -325,18 +321,13 @@ let adminsController = {validate,add,authenticate, sendNotification, getNotifica
         if(ParentStudent && ParentStudent.length <- 0){
           return res.status(404).json({ResponseCode: 404, Data: [], Message: "Parent not associated with student"});
         }
-        
-        let parent_ids = _.pluck(ParentStudent, 'ParentID');
 
-        let Parents = await ParentsModel.find({_id : {$in : parent_ids}});
-
+        let Parents = await ParentsModel.find({_id : {$in : _.pluck(ParentStudent, 'ParentID')}});
         if(Parents && Parents.length <= 0){
           return res.status(404).json({ResponseCode: 404, Data: [], Message: "No parents available"});
         }
 
-        let devices = _.pluck(Parents, "DeviceKey");
-
-        notification.sendNotification(req.body, devices);
+        notification.sendNotification(req.body, _.pluck(Parents, "DeviceKey"));
 
         let notificationObj = {
           AdminID: req.body.UserID,
@@ -388,7 +379,7 @@ let adminsController = {validate,add,authenticate, sendNotification, getNotifica
       let limit = req.query.Limit? Number(req.query.Limit) : 50; 
       let offset = req.query.Offset? Number(req.query.Offset) : 0; 
 
-      let notifications = await NotificationsModel.find({AdminID : req.body.UserID}).select({NotificationSubject : 1, NotificationContent : 1, createdAt : 1}).sort({"createdAt": -1}).limit(limit).skip(offset);
+      let notifications = await NotificationsModel.find({AdminID : mongoose.Types.ObjectId(req.body.UserID)}).select({NotificationSubject : 1, NotificationContent : 1, createdAt : 1}).sort({"createdAt": -1}).limit(limit).skip(offset);
 
       if(notifications && notifications.length){
           return res.status(200).json({ResponseCode : 200, Data : notifications, Message : "Notification list"});
