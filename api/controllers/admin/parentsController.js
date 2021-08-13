@@ -87,7 +87,8 @@ let parentsController = {validate,add}
           } catch (err) {
             return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
           }
-          return res.status(200).json({ResponseCode: 200, Data: {ParentID:Parent._id}, Message: 'Parent created successfully.'});
+          /*Add Parent_Name field in here */
+          return res.status(200).json({ResponseCode: 200, Data: {Parent_Name:req.body.Name,ParentID:Parent._id}, Message: 'Parent created successfully.'});
         }else{
           return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
         }

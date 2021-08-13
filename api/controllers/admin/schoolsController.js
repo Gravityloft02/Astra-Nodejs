@@ -115,14 +115,15 @@ let schoolsController = {validate,add,assign}
           /* Save School Classes */
           let SchoolClassesModelObj = new SchoolClassesModel({ClassID:ClassAcademics[i].Std,SchoolID:School._id,AcademicYear:ClassAcademics[i].AcademicYear,Std:ClassAcademics[i].Std,Division:ClassAcademics[i].Division});
           let SchoolClass = await SchoolClassesModelObj.save();
-          SchoolClassIDs.push(SchoolClass._id);
+          SchoolClassIDs.push({id:SchoolClass._id,Std:SchoolClass.Std,Division:SchoolClass.Division});
+          console.log(SchoolClassIDs)
 
           /* Save Fees */
           let FeesModelObj = new FeesModel({ClassID:SchoolClass._id,SchoolID:School._id,Amount:ClassAcademics[i].FeeAmount,DueDate:(req.body.DueDate || datetime.addTime(3,'months'))});
           await FeesModelObj.save();
         }
-
-        return res.status(200).json({ResponseCode: 200, Data: {SchoolID:School._id,SchoolClassIDs:SchoolClassIDs}, Message: 'School created successfully.'});
+        /* Added field School in response */
+        return res.status(200).json({ResponseCode: 200, Data: {School:req.body.Name,SchoolID:School._id,SchoolClassIDs:SchoolClassIDs}, Message: 'School created successfully.'});
       }else{
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }

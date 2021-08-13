@@ -107,8 +107,8 @@ let studentsController = {validate,add,assign}
           /* Save Student Class */
           let StudentClassModelObj = new StudentClassModel({SchoolClassID:mongoose.Types.ObjectId(req.body.SchoolClassID),StudentID:student._id});
           StudentClassModelObj.save();
-
-          return res.status(200).json({ResponseCode: 200, Data: {StudentID:student._id}, Message: 'Student created successfully.'});
+          /* --------Add Student_name field in the response -------*/
+          return res.status(200).json({ResponseCode: 200, Data: {Student_Name:req.body.Name,StudentID:student._id}, Message: 'Student created successfully.'});
         }else{
           return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
         }
