@@ -36,7 +36,8 @@ let schoolsController = {validate,add,assign}
                          throw new Error('Invalid state.');
                        }
                        return true
-                    })
+                    }),
+                    check('Payment_via_Astra').notEmpty().withMessage('please select if you want to use the payment option given by astra').trim().escape()
                  ]
            }
            break;
@@ -105,8 +106,15 @@ let schoolsController = {validate,add,assign}
       }
 
       /* Save School */
-      let SchoolModelObj = new SchoolsModel({Name:req.body.Name,Address:req.body.Address,State:req.body.State});
-      let School = await SchoolModelObj.save();
+      let SchoolModelObj = new SchoolsModel({Name:req.body.Name,
+        Address:req.body.Address,
+        State:req.body.State,
+        });
+        let School = await SchoolModelObj.save();
+        /** to update the payment option  */
+        await SchoolsModel.findOneAndUpdate({Name:req.body.Name},{Payment_via_Astra:req.body.Payment_via_Astra})
+        
+      console.log(School)
       if(School._id){
 
         let SchoolClassIDs = [];
@@ -115,6 +123,7 @@ let schoolsController = {validate,add,assign}
           /* Save School Classes */
           let SchoolClassesModelObj = new SchoolClassesModel({ClassID:ClassAcademics[i].Std,SchoolID:School._id,AcademicYear:ClassAcademics[i].AcademicYear,Std:ClassAcademics[i].Std,Division:ClassAcademics[i].Division});
           let SchoolClass = await SchoolClassesModelObj.save();
+          
           SchoolClassIDs.push(SchoolClass._id);
 
           /* Save Fees */
@@ -122,7 +131,7 @@ let schoolsController = {validate,add,assign}
           await FeesModelObj.save();
         }
 
-        return res.status(200).json({ResponseCode: 200, Data: {SchoolID:School._id,SchoolClassIDs:SchoolClassIDs}, Message: 'School created successfully.'});
+        return res.status(200).json({ResponseCode: 200, Data: {SchoolID:School._id,SchoolClassIDs:SchoolClassIDs}, Message: 'School created successfully. today'});
       }else{
         return res.status(500).json({ResponseCode: 500, Data: [], Message: constant.GLOBAL_ERROR});
       }

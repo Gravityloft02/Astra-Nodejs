@@ -26,6 +26,7 @@ const {NotificationsModel} = require("../models/notificationsModel");
 const {SchoolClassesModel} = require("../models/schoolClassModel");
 const {FeesModel} = require("../models/feesModel");
 const {AdminsModel} = require("../models/adminsModel");
+const { SchoolsModel } = require("../models/schoolsModel");
 
 /* Require Enviornment File  */
 require('dotenv').config();
@@ -129,10 +130,17 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
         let parentStudent = await ParentStudentModel.findOne({ParentID : mongoose.Types.ObjectId(ParentObj._id)});
 
         let studentClass = await StudentClassModel.findOne({StudentID : mongoose.Types.ObjectId(parentStudent.StudentID)});
-
+        console.log('class data',studentClass.SchoolClassID)
+        
+        /**to find School id */
+        let studentSchool_id=await SchoolClassesModel.findOne({_id: mongoose.Types.ObjectId(studentClass.SchoolClassID)})
+        console.log('school id',studentSchool_id)
+        let studentSchool=await SchoolsModel.findOne({_id:mongoose.Types.ObjectId(studentSchool_id.SchoolID)})
+        
         let fees = await FeesModel.findOne({ClassID: mongoose.Types.ObjectId(studentClass.SchoolClassID)});
-
+        console.log('data',studentSchool)
         /* Fetch Paid Amount Details */
+        
         var AmountObj = await PaymentsModel.aggregate([
                                 { "$match": { "StudentID": mongoose.Types.ObjectId(parentStudent.StudentID), "Status" : "Success"}},
                                 {
@@ -150,11 +158,14 @@ let parentsController = {validate,authenticate,update_device_details,fee_initiat
             RespObj.Token = jwt.sign({UserID:UserObj._id, ParentID:ParentObj._id, UserType : 'Parent'}, process.env.TOKEN_SECRET, { expiresIn: '36000s' }); // 600 minutes
             RespObj.StudentID = parentStudent.StudentID;
             RespObj.SchoolID = fees.SchoolID;
+            /**add below line */
+            RespObj.is_school_accepting_payment_via_app = studentSchool.Payment_via_Astra;
             RespObj.FeeAmount = fees.Amount;
             RespObj.DueDate = fees.DueDate;
             RespObj.ParentName = ParentObj.Name;
             RespObj.HelpContactNo = '+91-8080808080';
             RespObj.AmountPaid = (AmountObj.length === 0) ? 0 : AmountObj[0].total;
+            console.log(RespObj)
         return res.status(200).json({ResponseCode: 200, Data: RespObj, Message: 'success'});
       } catch (err) {
         console.log(err)
